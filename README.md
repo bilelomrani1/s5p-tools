@@ -92,12 +92,11 @@ The option `--shp` allows to mask the resulting final dataset based on the geome
 s5p-request <product-type> --shp <shapefile-file-url>
 ```
 
-The script expect a shapefile encoded in `utf-8` and projected with Longitude / Lattitude WGS84 projection. To standardize your `.shp` use the following `ogr2ogr` command from GDAL:
+The script expects a shapefile encoded in `utf-8` and projected with Longitude / Latitude WGS84 projection. To standardize your `.shp` file, use the following `ogr2ogr` command from GDAL:
 
 ```bash
 ogr2ogr -f "ESRI Shapefile" -lco ENCODING=UTF-8 -t_srs EPSG:4326 output.shp input.shp
 ```
-
 
 Example of use:
 ```bash
