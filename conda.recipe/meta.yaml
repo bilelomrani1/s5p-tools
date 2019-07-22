@@ -1,0 +1,44 @@
+
+{% set data = load_setup_py_data() %}
+
+package:
+  name: s5p_tools
+  
+  version: {{ data['version'] }}
+
+source:
+  path: ..
+
+build:
+  # If the installation is complex, or different between Unix and Windows, use
+  # separate bld.bat and build.sh files instead of this key.  Add the line
+  # "skip: True  # [py<35]" (for example) to limit to Python 3.5 and newer, or
+  # "skip: True  # [not win]" to limit to Windows.
+  script: python setup.py install --single-version-externally-managed --record=record.txt
+
+requirements:
+  build:
+    - python>=3.5
+    - setuptools
+  run:
+    - python>=3.5
+    - harp
+    - json-c
+    # dependencies are defined in setup.py
+    {% for dep in data['install_requires'] %}
+    - {{ dep.lower() }}
+    {% endfor %}
+
+test:
+  source_files:
+    - tests
+  requires:
+    - pytest
+    - pytest-cov
+  commands:
+    - pytest tests
+
+about:
+  home: https://github.com/bilelomrani1/s5p-tools
+  summary: A Python package and set of scripts to download, preprocess and plot data from Sentinel-5P
+  license: MIT

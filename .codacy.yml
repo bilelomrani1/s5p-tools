@@ -1,0 +1,8 @@
+---
+exclude_paths:
+  - 's5p_tools/_version.py'
+  - 'tests/**/*'
+  - 'tests/*'
+  - 'benchmarks/**/*'
+  - 'setup.py'
+  - 'versioneer.py'

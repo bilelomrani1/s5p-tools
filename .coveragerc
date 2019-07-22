@@ -1,0 +1,6 @@
+[report]
+omit =
+    setup.py
+    s5p_tools/__main__.py
+    s5p_tools/_version.py
+    versioneer.py

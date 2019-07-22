@@ -1,0 +1,147 @@
+#!/usr/local/bin/python
+
+import argparse
+from datetime import datetime
+from os import makedirs
+import warnings
+
+import xarray as xr
+import numpy as np
+from itertools import product
+import shapely.vectorized
+import cartopy.io.shapereader as shpreader
+
+from s5p_tools.s5p_tools import plot_map, plot_time_series
+from s5p_tools.pretty_print import printCyan, printBold, printRed
+
+
+# Ignore warnings
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+
+# -------------------------------------------------------------------
+# ------------------------------ PATHS ------------------------------
+# -------------------------------------------------------------------
+
+# res_directory: directory for plots
+RES_DIR = 'results'
+
+
+# -------------------------------------------------------------------
+# ------------------------- PARSE ARGUMENTS -------------------------
+# -------------------------------------------------------------------
+
+parser = argparse.ArgumentParser(
+    description='Generate plots for the specifies file'
+)
+
+# file: The .nc file to process
+parser.add_argument('file', help='The .nc file to process', type=str)
+
+
+# layer: Name of the entry to plot
+parser.add_argument('layer', help="Name of the entry to plot", type=str)
+
+
+# date: filter data between two dates
+parser.add_argument(
+    '--date', help='Filter data between two dates', nargs='+', type=str)
+
+
+# label: label next to the color bar
+parser.add_argument(
+    '--label', help="label next to the color bar",  nargs='+', type=str)
+
+
+# format: Format of the output
+parser.add_argument('--format', help="Format of the output",
+                    type=str, default='pdf')
+
+
+# shp: Shapefile url to iterate over areas
+parser.add_argument('--shp', help='Shapefile URL', type=str)
+
+
+# log: Toggle Log scale for color bar
+parser.add_argument('--log', dest='log', action='store_true')
+parser.add_argument('--no-log', dest='log', action='store_false')
+parser.set_defaults(log=True)
+
+args = parser.parse_args()
+
+
+# -------------------------------------------------------------------
+# ------------------- CREATE SESSION FOLDER -------------------------
+# -------------------------------------------------------------------
+
+today = datetime.now()
+session_folder = "{maps_directory}/{now}".format(
+    maps_directory=RES_DIR, now=today.strftime('%Y_%m_%d-%H%M'))
+makedirs(session_folder, exist_ok=True)
+
+
+# -------------------------------------------------------------------
+# --------------------- OPENING DATASET -----------------------------
+# -------------------------------------------------------------------
+
+printCyan('\n Open dataset...\n')
+if args.date is not None:
+    date = tuple(args.date)
+    DS = xr.open_dataset(args.file, chunks={'time': 100}).sel(
+        time=slice(date[0], date[1]))
+else:
+    DS = xr.open_dataset(args.file, chunks={'time': 100})
+
+DS_temp_avg = DS.mean(dim='time')
+
+points = list(product(DS.latitude.values, DS.longitude.values))
+x = [i for j, i in points]
+y = [j for j, i in points]
+
+val_min = np.nanmin(DS_temp_avg[args.layer].values)
+val_max = np.nanmax(DS_temp_avg[args.layer].values)
+
+
+# -------------------------------------------------------------------
+# ----------------------- Generate plot ----------------------------
+# -------------------------------------------------------------------
+
+printCyan('\n Generate plots...\n')
+
+if args.label is None:
+    label = ''
+else:
+    label = ' '.join(args.label)
+
+if args.shp is not None:
+
+    reader = shpreader.Reader(args.shp)
+    regions = list(reader.records())
+
+    for index,region in enumerate(regions):
+        mask = shapely.vectorized.contains(region.geometry, x, y).reshape(
+            (DS.latitude.shape[0], DS.longitude.shape[0]))
+
+        # test if mask contains only False
+        if np.any(mask):
+            print("Processing {region}".format(region=index))
+
+            mask_array = xr.DataArray(mask, dims=('latitude', 'longitude'),
+                                      coords={'longitude': DS.longitude, 'latitude': DS.latitude})
+            masked_data = DS_temp_avg.where(mask_array, drop=True)
+
+            plot_map(masked_data, args.layer, label, index,
+                     session_folder, val_min, val_max, log=args.log, format=args.format)
+
+            plot_time_series(DS.where(mask_array, drop=True).mean(dim='longitude').mean(dim='latitude'),
+                             args.layer, label, index, session_folder, format=args.format)
+
+        else:
+            print("{region} does not intersect AOI".format(region=index))
+
+else:
+    print("Processing map")
+    plot_map(DS_temp_avg, args.layer, label, 'no-mask',
+             session_folder, val_min, val_max, log=args.log, format=args.format)
+    plot_time_series(DS.mean(dim='longitude').mean(dim='latitude'),
+                     args.layer, label, 'no-mask', session_folder, format=args.format)

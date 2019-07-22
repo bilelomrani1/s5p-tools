@@ -1,0 +1,347 @@
+#!/usr/local/bin/python
+
+from datetime import datetime
+import argparse
+from os.path import exists
+from os import makedirs
+import warnings
+from getpass import getpass
+
+import xarray as xr
+import pandas as pd
+from dask.diagnostics import ProgressBar
+
+from s5p_tools.s5p_tools import geojson_window, convert_to_l3_products, request_copernicus_hub, get_filenames_request, make_country_mask
+from s5p_tools.pretty_print import printCyan, printRed, printBold
+
+
+# Ignore warnings
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+
+# -------------------------------------------------------------------
+# --------------------- LOGINS AND PARAMS ---------------------------
+# -------------------------------------------------------------------
+
+# Perform checksum verification after each download
+CHECKSUM = True
+
+
+# -------------------------------------------------------------------
+# ------------------------------ PATHS ------------------------------
+# -------------------------------------------------------------------
+
+# download_directory: directory for L2 products
+DOWNLOAD_DIR = 'L2_data'
+
+# export_directory: directory for L3 products
+EXPORT_DIR = 'L3_data'
+
+# processed_directory: directory for processed products (aggregated+masked)
+PROCESSED_DIR = 'processed'
+
+
+# -------------------------------------------------------------------
+# ------------------------- PARSE ARGUMENTS -------------------------
+# -------------------------------------------------------------------
+
+parser = argparse.ArgumentParser(
+    description='Request, download and process Sentinel data from Copernicus access hub'
+)
+
+# Product type: Used to perform a product based search
+# Possible values are
+#   L2__O3____
+#   L2__NO2___
+#   L2__SO2___
+#   L2__CO____
+#   L2__CH4___
+#   L2__HCHO__
+#   L2__AER_AI
+#   L2__CLOUD_
+parser.add_argument('product', help='Product type', type=str)
+
+
+# Date: Used to perform a time interval search
+# The general form to be used is:
+#       date=(< timestamp>, <timestamp>)
+# where < timestamp > can be expressed in one of the following formats:
+#   yyyyMMdd
+#   yyyy-MM-ddThh:mm:ssZ
+#   yyyy-MM-ddThh:mm:ss.SSSZ(ISO8601 format)
+#   NOW
+#   NOW-<n>MINUTE(S)
+#   NOW-<n>HOUR(S)
+#   NOW-<n>DAY(S)
+#   NOW-<n>MONTH(S)
+parser.add_argument('--date', help='Date', nargs='+',
+                    type=str, default=('NOW-24HOURS', 'NOW'))
+
+
+# Area of interest: The url of the area of interest (.geojson file) relative to current directory
+parser.add_argument(
+    '--aoi', help='The url of the area of interest (.geojson file) relative to current directory', type=str)
+
+
+# Shapefile: The url of the shapefile (.shp) for pixel filtering
+parser.add_argument('--shp', help='The url of the shapefile (.shp) relative to current directory for pixel filtering',
+                    type=str)
+
+
+# Platform: Name of the platform
+parser.add_argument('--platform', help='Platform name', type=str)
+
+
+# Harp command: Harp convert command used during import of products
+parser.add_argument('--command', help='Harp convert command used during import of products',
+                    type=str)
+
+
+# Unit: Unit conversion
+parser.add_argument('--unit', help='Unit conversion',
+                    default='molec/m2', type=str)
+
+
+args = parser.parse_args()
+
+
+# -------------------------------------------------------------------
+# ------------- QUERYING & DOWNLOADING PRODUCTS ---------------------
+# -------------------------------------------------------------------
+
+s5p_products = [
+    "L2__O3____",
+    "L2__NO2___",
+    "L2__SO2___",
+    "L2__CO____",
+    "L2__CH4___",
+    "L2__HCHO__",
+    "L2__AER_AI",
+    "L2__CLOUD_"
+]
+
+# Credentials
+if args.platform == 'Sentinel-5 Precursor' or args.product in s5p_products:
+    DHUS_USER = 's5pguest'
+    DHUS_PASSWORD = 's5pguest'
+    DHUS_URL = 'https://s5phub.copernicus.eu/dhus'
+
+    FIX_EXTENSION = True
+
+else:
+    DHUS_USER = input('username: ')
+    DHUS_PASSWORD = getpass('password: ')
+    DHUS_URL = 'https://scihub.copernicus.eu/dhus'
+
+    FIX_EXTENSION = False
+
+
+printCyan('\n Request products...\n')
+
+if args.platform is None:
+    _, products = request_copernicus_hub(login=DHUS_USER,
+                                         password=DHUS_PASSWORD,
+                                         hub=DHUS_URL,
+                                         aoi=args.aoi,
+                                         date=tuple(args.date),
+                                         producttype=args.product,
+                                         download_directory='{dir}/{product_dir}'.format(dir=DOWNLOAD_DIR,
+                                                                                         product_dir=args.product),
+                                         checksum=CHECKSUM,
+                                         fix_extension=FIX_EXTENSION)
+
+else:
+    _, products = request_copernicus_hub(login=DHUS_USER,
+                                         password=DHUS_PASSWORD,
+                                         hub=DHUS_URL,
+                                         aoi=args.aoi,
+                                         date=tuple(args.date),
+                                         platformname=args.platform,
+                                         producttype=args.product,
+                                         download_directory='{dir}/{product_dir}'.format(dir=DOWNLOAD_DIR,
+                                                                                         product_dir=args.product),
+                                         checksum=CHECKSUM,
+                                         fix_extension=FIX_EXTENSION)
+
+
+L2_files_urls = get_filenames_request(products, '{dir}/{product_dir}'.format(dir=DOWNLOAD_DIR,
+                                                                             product_dir=args.product))
+
+
+if args.platform == 'Sentinel-5 Precursor' or args.product in s5p_products:
+
+    # -------------------------------------------------------------------
+    # ----------------------- PREPROCESS DATA ---------------------------
+    # -------------------------------------------------------------------
+
+    printCyan('\n Convert into L3 products...\n')
+
+    # harpconvert commands :
+    # the source data is filtered to remove any values with QA values less than 50 according to Copernicus specifications
+    # + binning data by latitude/longitude
+
+    harp_commands = {
+        'L2__NO2___': ('tropospheric_NO2_column_number_density>=0;'
+                       'tropospheric_NO2_column_number_density_validity>50;'
+                       'derive(tropospheric_NO2_column_number_density [{unit}]);'
+                       'derive(stratospheric_NO2_column_number_density [{unit}]);'
+                       'derive(NO2_slant_column_number_density [{unit}]);'
+                       'keep(NO2_column_number_density,tropospheric_NO2_column_number_density,'
+                       'stratospheric_NO2_column_number_density,NO2_slant_column_number_density,'
+                       'tropopause_pressure,absorbing_aerosol_index,cloud_fraction,sensor_altitude,'
+                       'sensor_azimuth_angle, sensor_zenith_angle,solar_azimuth_angle,solar_zenith_angle,'
+                       'datetime_start,datetime_length,latitude_bounds,longitude_bounds)'
+                       ).format(unit=args.unit),
+
+        'L2__O3____': ('O3_column_number_density>=0;O3_column_number_density_validity>50;'
+                       'derive(O3_column_number_density [{unit}]);'
+                       'keep(O3_column_number_density,cloud_fraction,'
+                       'sensor_azimuth_angle,sensor_zenith_angle,solar_azimuth_angle, solar_zenith_angle,'
+                       'datetime_start,datetime_length,latitude_bounds,longitude_bounds)'
+                       ).format(unit=args.unit),
+
+        'L2__SO2___': ('SO2_column_number_density>=0;SO2_column_number_density_validity>50;'
+                       'derive(SO2_column_number_density [{unit}]);'
+                       'derive(SO2_slant_column_number_density [{unit}]);'
+                       'keep(SO2_column_number_density,SO2_column_number_density_amf,'
+                       'SO2_slant_column_number_density,cloud_fraction, sensor_altitude,'
+                       'sensor_azimuth_angle, sensor_zenith_angle,solar_azimuth_angle, solar_zenith_angle,'
+                       'datetime_start,datetime_length,latitude_bounds,longitude_bounds)'
+                       ).format(unit=args.unit),
+
+        'L2__HCHO__': ('tropospheric_HCHO_column_number_density>=0;'
+                       'tropospheric_HCHO_column_number_density_validity>50;'
+                       'derive(tropospheric_HCHO_column_number_density [{unit}]);'
+                       'derive(HCHO_slant_column_number_density [{unit}]);'
+                       'keep(tropospheric_HCHO_column_number_density,'
+                       'tropospheric_HCHO_column_number_density_amf,'
+                       'HCHO_slant_column_number_density,cloud_fraction,sensor_altitude,'
+                       'sensor_azimuth_angle, sensor_zenith_angle,solar_azimuth_angle,'
+                       'solar_zenith_angle,datetime_start,datetime_length,latitude_bounds,longitude_bounds)'
+                       ).format(unit=args.unit),
+
+        'L2__CO____': ('CO_column_number_density>=0;CO_column_number_density_validity>50;'
+                       'derive(CO_column_number_density [{unit}]);'
+                       'derive(H2O_column_number_density [{unit}]);'
+                       'keep(CO_column_number_density,H2O_column_number_density,'
+                       'cloud_height, sensor_altitude,sensor_azimuth_angle, sensor_zenith_angle,'
+                       'solar_azimuth_angle,solar_zenith_angle,'
+                       'datetime_start,datetime_length,latitude_bounds,longitude_bounds)'
+                       ).format(unit=args.unit),
+
+        'L2__CH4___': ('CH4_column_volume_mixing_ratio_dry_air>=0;'
+                       'CH4_column_volume_mixing_ratio_dry_air_validity>50;'
+                       'keep(CH4_column_volume_mixing_ratio_dry_air, aerosol_height,'
+                       'aerosol_optical_depth, sensor_azimuth_angle, sensor_zenith_angle,'
+                       'solar_azimuth_angle, solar_zenith_angle,'
+                       'datetime_start,datetime_length,latitude_bounds,longitude_bounds)'
+                       ).format(unit=args.unit),
+
+        'L2__AER_AI': ('absorbing_aerosol_index_validity>50;'
+                       'keep(absorbing_aerosol_index,sensor_altitude,sensor_azimuth_angle,'
+                       'sensor_zenith_angle,solar_azimuth_angle,solar_zenith_angle,'
+                       'datetime_start,datetime_length,latitude_bounds,longitude_bounds)'
+                       ).format(unit=args.unit),
+
+        'L2__CLOUD_': ('cloud_fraction>=0;cloud_fraction_validity>50;'
+                       'keep(cloud_fraction,cloud_top_pressure,cloud_top_height, cloud_base_pressure,'
+                       'cloud_base_height,cloud_optical_depth,surface_albedo, sensor_azimuth_angle,'
+                       'sensor_zenith_angle,solar_azimuth_angle, solar_zenith_angle,'
+                       'datetime_start,datetime_length,latitude_bounds,longitude_bounds)'
+                       ).format(unit=args.unit)
+    }
+
+    # extent: compute map extent from aoi
+    extent = geojson_window(args.aoi)
+
+    # Step size for spatial re-gridding (in degrees)
+    LON_STEP = 0.01
+    LAT_STEP = 0.01
+
+    # computes offsets and number of samples
+    lat_edge_length = int(abs(extent[3] - extent[2]) / LAT_STEP + 1)
+    lat_edge_offset = extent[2]
+    lon_edge_length = int(abs(extent[1] - extent[0]) / LON_STEP + 1)
+    lon_edge_offset = extent[0]
+
+    if args.command is None:
+        conversion_command = harp_commands[args.product]
+    else:
+        conversion_command = args.command
+
+    pre_commands = ('{conversion_command};exclude(datetime_length);'
+                    'bin_spatial({lat_edge_length}, {lat_edge_offset}, {lat_step}, {lon_edge_length}, {lon_edge_offset},'
+                    '{lon_step});derive(latitude {{latitude}});derive(longitude {{longitude}});'
+                    'exclude(longitude_bounds,latitude_bounds)').format(
+                        lat_edge_length=lat_edge_length,
+                        lat_edge_offset=lat_edge_offset,
+                        lat_step=LAT_STEP,
+                        lon_edge_length=lon_edge_length,
+                        lon_edge_offset=lon_edge_offset,
+                        lon_step=LON_STEP,
+                        conversion_command=conversion_command)
+
+    post_commands = "squash(time, longitude);squash(time, latitude)"
+
+    # perform conversion
+    L3_product_url = convert_to_l3_products(L2_files_urls, pre_commands, post_commands,
+                                            export_path='{dir}/{product_dir}'.format(dir=EXPORT_DIR,
+                                                                                     product_dir=args.product.replace('L2', 'L3')))
+
+    # -------------------------------------------------------------------
+    # ------------------ AGGREGRATE PRODUCTS ----------------------------
+    # -------------------------------------------------------------------
+
+    printCyan('\n Process data...\n')
+
+    with ProgressBar():
+        # open L2 products
+        DS = xr.open_mfdataset([filename.replace('L2', 'L3') for filename in L2_files_urls
+                                if exists(filename.replace('L2', 'L3'))], concat_dim='time')
+
+        # create a new coordinate based on datetime_start (year-month-day) -> binning by day
+        DS = DS.assign_coords(time=pd.to_datetime(
+            DS.datetime_start.values).date.astype('datetime64[ns]'))
+
+        # filter pixels
+        if args.shp is not None:
+            mask = make_country_mask(args.shp, DS.longitude, DS.latitude)
+
+            for column in [column_name for column_name in list(DS.variables)
+                           if DS[column_name].dims == ('time', 'latitude', 'longitude')]:
+                DS[column] = DS[column].where(mask)
+
+        # Group by day
+        try:
+            DS = DS.groupby('time').mean(dim='time')
+        except:
+            print("No binning by day required.")
+
+    # -------------------------------------------------------------------
+    # ---------------------- EXPORT PRODUCTS ----------------------------
+    # -------------------------------------------------------------------
+
+    printCyan('\n Export data...\n')
+
+    start = min([products[uuid]['beginposition'] for uuid in products.keys()])
+    end = max([products[uuid]['endposition'] for uuid in products.keys()])
+
+    if not exists('{dir}/processed{product}'.format(dir=PROCESSED_DIR, product=args.product[2:])):
+        makedirs('{dir}/processed{product}'.format(dir=PROCESSED_DIR,
+                                                   product=args.product[2:]))
+
+    file_export_name = ('{dir}/processed{product}/{product_type}{start_day}-{start_month}-{start_year}__'
+                        '{end_day}-{end_month}-{end_year}.nc').format(dir=PROCESSED_DIR,
+                                                                      product=args.product[2:],
+                                                                      start_day=start.day,
+                                                                      start_month=start.month,
+                                                                      start_year=start.year,
+                                                                      end_day=end.day,
+                                                                      end_month=end.month,
+                                                                      end_year=end.year,
+                                                                      product_type=args.product[4:])
+
+    with ProgressBar():
+        DS.to_netcdf(file_export_name)
+
+printCyan('\n Done\n')
