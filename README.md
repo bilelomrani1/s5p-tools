@@ -42,7 +42,7 @@ where `<product-type>` is a Sentinel-5P product. TROPOMI Level 2 geophysical pro
 
 By default, the script downloads the data corresponding to the specified product for the last 24 hours. Custom date query can be specified via the option `--date`.
 
-The resulting file is a `netCDF` file, binned by time, latitude, longitude, aligned on the same L3 grid. The products are grouped by day.
+The resulting file is a `netCDF` file in the `processed` folder, binned by time, latitude, longitude, aligned on the same L3 grid. The products are grouped by day.
 
 ### Options
 
