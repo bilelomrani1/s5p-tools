@@ -95,7 +95,7 @@ def plot_map(DS, layer_name, label, map_name, session_folder, val_min, val_max, 
                                                                           region=map_name,
                                                                                format=format),
                 bbox_inches='tight',
-                pad_inches=0)
+                pad_inches=0, dpi=300)
 
 
 def plot_time_series(DS, layer_name, label, map_name, session_folder, format='pdf'):
@@ -116,4 +116,4 @@ def plot_time_series(DS, layer_name, label, map_name, session_folder, format='pd
                                                                                          couche=layer_name,
                                                                                          region=map_name,
                                                                                               format=format),
-                pad_inches=0)
+                pad_inches=0, dpi=300)
