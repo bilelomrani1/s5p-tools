@@ -65,7 +65,7 @@ parser.add_argument('--shp', help='Shapefile URL', type=str)
 # log: Toggle Log scale for color bar
 parser.add_argument('--log', dest='log', action='store_true')
 parser.add_argument('--no-log', dest='log', action='store_false')
-parser.set_defaults(log=True)
+parser.set_defaults(log=False)
 
 args = parser.parse_args()
 

@@ -70,7 +70,7 @@ def plot_map(DS, layer_name, label, map_name, session_folder, val_min, val_max, 
                             DS.latitude,
                             DS[layer_name],
                             transform=MAP_PROJECTION,
-                            cmap=COLOR_PALETTE,
+                            cmap=ccrs.PlateCarree(),
                             vmin=val_min, vmax=val_max,
                             norm=colors.LogNorm())
     else:
@@ -78,7 +78,7 @@ def plot_map(DS, layer_name, label, map_name, session_folder, val_min, val_max, 
                             DS.latitude,
                             DS[layer_name],
                             transform=MAP_PROJECTION,
-                            cmap=COLOR_PALETTE,
+                            cmap=ccrs.PlateCarree(),
                             vmin=val_min, vmax=val_max)
 
     plt.title('')

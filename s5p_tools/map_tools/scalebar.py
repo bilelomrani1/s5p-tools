@@ -119,10 +119,14 @@ def _point_along_line(ax, start, distance, angle=0, tol=0.01):
 
 
 def scale_bar(ax, location, length, metres_per_unit=1000, unit_name='km',
-              tol=0.01, angle=0, color='black', linewidth=3, text_offset=0.005,
+              tol=0.01, angle=0, color='black', linewidth=2, text_offset=0.005,
               ha='center', va='bottom', plot_kwargs=None, text_kwargs=None,
               **kwargs):
     """Add a scale bar to CartoPy axes.
+
+    For angles between 0 and 90 the text and line may be plotted at
+    slightly different angles for unknown reasons. To work around this,
+    override the 'rotation' keyword argument with text_kwargs.
 
     Args:
         ax:              CartoPy axes.
@@ -153,14 +157,8 @@ def scale_bar(ax, location, length, metres_per_unit=1000, unit_name='km',
     text_kwargs = {'ha': ha, 'va': va, 'rotation': angle, 'color': color,
                    **text_kwargs, **kwargs}
 
-    llx0, llx1, lly0, lly1 = ax.get_extent(ccrs.PlateCarree())
-    # Make tmc horizontally centred on the middle of the map,
-    # vertically at scale bar location
-    sbllx = (llx1 + llx0) / 2
-    sblly = lly0 + (lly1 - lly0) * location[1]
-    tmc = ccrs.Mercator(sbllx, sblly)
-    # Get the extent of the plotted area in coordinates in metres
-    x0, x1, y0, y1 = ax.get_extent(tmc)
+    # Convert all units and types.
+    location = np.asarray(location)  # For vector addition.
 
     # Calculate a scale bar length if none has been given
     # (Theres probably a more pythonic way of rounding the number but this works)
@@ -177,10 +175,7 @@ def scale_bar(ax, location, length, metres_per_unit=1000, unit_name='km',
                 return scale_number(x - 10 ** ndim)
         length = scale_number(length)
 
-    length_metres = length * metres_per_unit / 100000
-
-    # Convert all units and types.
-    location = np.asarray(location)  # For vector addition.
+    length_metres = length * metres_per_unit
     angle_rad = angle * np.pi / 180
 
     # End-point of bar.

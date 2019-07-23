@@ -33,7 +33,7 @@ def _get_resize_event_function(ax, cbar_ax, location, width, height):
     def resize_color_bar(event):
         plt.draw()
         posn = ax.get_position()
-        cbar_ax.set_position([posn.x0 + posn.width + location[0] - 1, posn.y0,
+        cbar_ax.set_position([posn.x0 + posn.width + location[0] - 1, posn.y0 + location[1],
                               width, posn.height - 1 + height])
 
     return resize_color_bar
