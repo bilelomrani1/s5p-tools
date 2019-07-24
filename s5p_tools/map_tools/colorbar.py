@@ -50,9 +50,9 @@ def color_bar(fig, ax, label, location, width, height, nbins=5, ticks_steps=[1, 
     cbar.ax.tick_params(width=1)
 
     if log:
-        tick_locator = matplotlib.ticker.MaxNLocator(nbins)
-    else:
         tick_locator = matplotlib.ticker.LogLocator(subs=tuple(ticks_steps))
+    else:
+        tick_locator = matplotlib.ticker.MaxNLocator(nbins)
 
     cbar.locator = tick_locator
     cbar.update_ticks()
