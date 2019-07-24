@@ -39,17 +39,21 @@ def _get_resize_event_function(ax, cbar_ax, location, width, height):
     return resize_color_bar
 
 
-def color_bar(fig, ax, label, location, width, height):
+def color_bar(fig, ax, label, location, width, height, nbins=5, ticks_steps=[1, 0.2, 0.3, 0.5, 0.7], log=True):
 
-    cbformat = matplotlib.ticker.ScalarFormatter(
-        useMathText=True)  # create the formatter
+    cbformat = matplotlib.ticker.ScalarFormatter(useMathText=True, useOffset=True)
     cbformat.set_scientific(True)
     cbformat.set_powerlimits((0, 0))
 
     cbar_ax = fig.add_axes([location[0], location[1], width, height])
     cbar = plt.colorbar(cax=cbar_ax, format=cbformat, pad=20)
     cbar.ax.tick_params(width=1)
-    tick_locator = matplotlib.ticker.MaxNLocator(steps=[1, 2, 5, 10])
+
+    if log:
+        tick_locator = matplotlib.ticker.MaxNLocator(nbins)
+    else:
+        tick_locator = matplotlib.ticker.LogLocator(subs=tuple(ticks_steps))
+
     cbar.locator = tick_locator
     cbar.update_ticks()
 
