@@ -5,7 +5,7 @@ Set of tools to query Copernicus database.
 from os import listdir, rename, makedirs
 from os.path import exists
 
-from sentinelsat.sentinel import SentinelAPI, read_geojson, geojson_to_wkt
+from sentinelsat.sentinel import SentinelAPI, read_geojson, geojson_to_wkt, InvalidChecksumError, SentinelAPIError
 from ..pretty_print import printBold, printCyan, printRed
 
 
@@ -128,22 +128,25 @@ def request_copernicus_hub(aoi=None, login='s5pguest', password='s5pguest', hub=
 
             try:
                 api.get_product_odata(file_id)
-            except:
+            except SentinelAPIError:
                 printRed(
                     "Error: File {name} not found in Hub. Skipping".format(name=file_id))
             else:
-                try:
-                    api.download(
-                        file_id, directory_path=download_directory, checksum=checksum)
-                except:
-                    printRed("Error during download")
-                else:
-                    # fix .zip extention
-                    if fix_extension:
-                        rename("{download_directory}/{name}.zip".format(download_directory=download_directory,
-                                                                        name=products[file_id]['title']),
-                               "{download_directory}/{name}.nc".format(download_directory=download_directory,
-                                                                       name=products[file_id]['title']))
+                while True:    
+                    try:
+                        api.download(
+                            file_id, directory_path=download_directory, checksum=checksum)
+                    except InvalidChecksumError:
+                        printRed("Invalid Checksum Error. Trying again...")
+                        continue
+                    else:
+                        # fix .zip extention
+                        if fix_extension:
+                            rename("{download_directory}/{name}.zip".format(download_directory=download_directory,
+                                                                            name=products[file_id]['title']),
+                                "{download_directory}/{name}.nc".format(download_directory=download_directory,
+                                                                        name=products[file_id]['title']))
+                        break
 
         else:
             print("File {name} already exists".format(name=file_id))
