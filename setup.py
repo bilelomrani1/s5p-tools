@@ -32,6 +32,6 @@ setup(
     ],
     long_description=long_description,
     long_description_content_type='text/markdown',
-    scripts=['s5p_tools/bin/s5p-plots', 's5p_tools/bin/s5p-request'],
+    scripts=['s5p_tools/bin/s5p-request'],
     license="MIT"
 )

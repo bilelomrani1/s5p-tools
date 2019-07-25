@@ -48,7 +48,6 @@ The resulting file is a `netCDF` file in the `processed` folder, binned by time,
 
 The script `s5p-request` supports the following optional arguments:
 
-
 #### Date
 
 The option `--date` allows to specify a custom time range:
@@ -66,22 +65,12 @@ where `<timestamp>` can be expressed in one of the following formats:
   - NOW-<n>DAY(S)
   - NOW-<n>MONTH(S)
 
-Example of use:
-```bash
-s5p-request L2__NO2___ --date 20190101 NOW
-```
-
 #### Area of interest
 
 The option `--aoi` allows to specify a custom geographical area with a `geojson` file.
 
 ```bash
 s5p-request <product-type> --aoi <geojson-file-url>
-```
-
-Example of use:
-```bash
-s5p-request L2__NO2___ --aoi geojson_files/france.geojson
 ```
 
 #### Shapefile
@@ -98,34 +87,15 @@ The script expects a shapefile encoded in `utf-8` and projected with Longitude /
 ogr2ogr -f "ESRI Shapefile" -lco ENCODING=UTF-8 -t_srs EPSG:4326 output.shp input.shp
 ```
 
-Example of use:
-```bash
-s5p-request L2__NO2___ --shp shapefiles/france.shp
-```
-
 #### Unit conversion
 
-By default, all products are converted in molec/m2 (except L2__CH4___, L2__AER_AI, L2__CLOUD_). To specify a custom unit conversion, use the option `--unit`.
+By default, all products are converted in `molec/m2` (except `L2__CH4___`, `L2__AER_AI`, `L2__CLOUD_`). To specify a custom unit conversion, use the option `--unit`.
 
 ```bash
 s5p-request <product-type> --unit <unit>
 ```
 
-Example of use:
-```bash
-s5p-request L2__NO2___ --unit kg/m2
-```
-
-Unit conversion support the following arguments:
+Unit conversion supports the following arguments:
 - `molec/m2`
 - `kg/m2`
 - `mol/m2`
-
-
-## Downloading and processing data
-
-The command `s5p-plots` is used to quickly visualized the data processed by `s5p-request`.
-
-```bash
-s5p-plots <processed-file-url>
-```

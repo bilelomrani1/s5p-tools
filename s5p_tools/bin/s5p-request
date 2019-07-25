@@ -20,7 +20,7 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
 # -------------------------------------------------------------------
-# --------------------- LOGINS AND PARAMS ---------------------------
+# -------------------------- PARAMS ---------------------------------
 # -------------------------------------------------------------------
 
 # Perform checksum verification after each download
@@ -136,7 +136,7 @@ else:
     FIX_EXTENSION = False
 
 
-printCyan('\n Request products...\n')
+printCyan('\nRequest products\n')
 
 if args.platform is None:
     _, products = request_copernicus_hub(login=DHUS_USER,
@@ -168,45 +168,51 @@ L2_files_urls = get_filenames_request(products, '{dir}/{product_dir}'.format(dir
                                                                              product_dir=args.product))
 
 
-if args.platform == 'Sentinel-5 Precursor' or args.product in s5p_products:
+if (args.platform == 'Sentinel-5 Precursor' or args.product in s5p_products) and len(L2_files_urls) > 0:
 
     # -------------------------------------------------------------------
     # ----------------------- PREPROCESS DATA ---------------------------
     # -------------------------------------------------------------------
 
-    printCyan('\n Convert into L3 products...\n')
+    printCyan('\nConvert into L3 products\n')
 
     # harpconvert commands :
     # the source data is filtered to remove any values with QA values less than 50 according to Copernicus specifications
     # + binning data by latitude/longitude
 
     harp_commands = {
+
         'L2__NO2___': ('tropospheric_NO2_column_number_density_validity>50;'
-                    'derive(tropospheric_NO2_column_number_density [{unit}]);'
-                    'derive(stratospheric_NO2_column_number_density [{unit}]);'
-                    'derive(NO2_column_number_density [{unit}]);'
-                    'derive(NO2_slant_column_number_density [{unit}])').format(unit=args.unit),
+                       'derive(tropospheric_NO2_column_number_density [{unit}]);'
+                       'derive(stratospheric_NO2_column_number_density [{unit}]);'
+                       'derive(NO2_column_number_density [{unit}]);'
+                       'derive(NO2_slant_column_number_density [{unit}])').format(unit=args.unit),
 
         'L2__O3____': ('O3_column_number_density_validity>50;'
-                    'derive(O3_column_number_density [{unit}]);').format(unit=args.unit),
+                       'derive(O3_column_number_density [{unit}]);'
+                       'derive(O3_slant_column_number_density [{unit}])').format(unit=args.unit),
 
         'L2__SO2___': ('SO2_column_number_density_validity>50;'
-                    'derive(SO2_column_number_density [{unit}]);'
-                    'derive(SO2_slant_column_number_density [{unit}])').format(unit=args.unit),
+                       'derive(SO2_column_number_density [{unit}]);'
+                       'derive(SO2_slant_column_number_density [{unit}])').format(unit=args.unit),
 
         'L2__HCHO__': ('tropospheric_HCHO_column_number_density_validity>50;'
-                    'derive(tropospheric_HCHO_column_number_density [{unit}]);'
-                    'derive(HCHO_slant_column_number_density [{unit}])').format(unit=args.unit),
+                       'derive(tropospheric_HCHO_column_number_density [{unit}]);'
+                       'derive(HCHO_slant_column_number_density [{unit}])').format(unit=args.unit),
 
         'L2__CO____': ('CO_column_number_density_validity>50;'
-                    'derive(CO_column_number_density [{unit}]);'
-                    'derive(H2O_column_number_density [{unit}])').format(unit=args.unit),
+                       'derive(CO_column_number_density [{unit}]);'
+                       'derive(H2O_column_number_density [{unit}])').format(unit=args.unit),
 
-        'L2__CH4___': ('CH4_column_volume_mixing_ratio_dry_air_validity>50').format(unit=args.unit),
+        'L2__CH4___': ('CH4_column_volume_mixing_ratio_dry_air_validity>50;'
+                       'derive(H2O_column_number_density [{unit}]);'
+                       'derive(dry_air_column_number_density [{unit}]);'
+                       'derive(CH4_column_number_density_apriori [{unit}])').format(unit=args.unit),
 
         'L2__AER_AI': ('absorbing_aerosol_index_validity>50').format(unit=args.unit),
 
         'L2__CLOUD_': ('cloud_fraction_validity>50').format(unit=args.unit)
+
     }
 
     # extent: compute map extent from aoi
@@ -228,9 +234,8 @@ if args.platform == 'Sentinel-5 Precursor' or args.product in s5p_products:
         conversion_command = args.command
 
     pre_commands = ('{conversion_command};exclude(datetime_length);'
-                    'bin_spatial({lat_edge_length}, {lat_edge_offset}, {lat_step}, {lon_edge_length}, {lon_edge_offset},'
-                    '{lon_step});derive(latitude {{latitude}});derive(longitude {{longitude}});'
-                    'exclude(longitude_bounds,latitude_bounds)').format(
+                    'bin_spatial({lat_edge_length},{lat_edge_offset},{lat_step},{lon_edge_length},{lon_edge_offset},'
+                    '{lon_step});derive(latitude {{latitude}});derive(longitude {{longitude}})').format(
                         lat_edge_length=lat_edge_length,
                         lat_edge_offset=lat_edge_offset,
                         lat_step=LAT_STEP,
@@ -239,18 +244,17 @@ if args.platform == 'Sentinel-5 Precursor' or args.product in s5p_products:
                         lon_step=LON_STEP,
                         conversion_command=conversion_command)
 
-    post_commands = "squash(time, longitude);squash(time, latitude)"
-
     # perform conversion
-    L3_product_url = convert_to_l3_products(L2_files_urls, pre_commands, post_commands,
-                                            export_path='{dir}/{product_dir}'.format(dir=EXPORT_DIR,
-                                                                                     product_dir=args.product.replace('L2', 'L3')))
+    L3_product_url = convert_to_l3_products(L2_files_urls, pre_commands, export_path='{dir}/{product_dir}'.format(dir=EXPORT_DIR,
+                                            product_dir=args.product.replace('L2', 'L3')))
 
     # -------------------------------------------------------------------
     # ------------------ AGGREGRATE PRODUCTS ----------------------------
     # -------------------------------------------------------------------
 
-    printCyan('\n Process data...\n')
+    printCyan('\nProcess data\n')
+
+    # Avoid lost attributes during conversion
     xr.set_options(keep_attrs=True)
 
     with ProgressBar():
@@ -270,17 +274,13 @@ if args.platform == 'Sentinel-5 Precursor' or args.product in s5p_products:
                            if DS[column_name].dims == ('time', 'latitude', 'longitude')]:
                 DS[column] = DS[column].where(mask)
 
-        # Group by day
-        try:
-            DS = DS.groupby('time').mean(dim='time')
-        except:
-            print("No binning by day required.")
+        DS = DS.groupby('time').mean(dim='time')
 
     # -------------------------------------------------------------------
     # ---------------------- EXPORT PRODUCTS ----------------------------
     # -------------------------------------------------------------------
 
-    printCyan('\n Export data...\n')
+    printCyan('\nExport data...\n')
 
     start = min([products[uuid]['beginposition'] for uuid in products.keys()])
     end = max([products[uuid]['endposition'] for uuid in products.keys()])
@@ -303,4 +303,4 @@ if args.platform == 'Sentinel-5 Precursor' or args.product in s5p_products:
     with ProgressBar():
         DS.to_netcdf(file_export_name)
 
-printCyan('\n Done\n')
+printCyan('\nDone\n')

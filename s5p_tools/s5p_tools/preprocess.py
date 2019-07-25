@@ -61,7 +61,7 @@ def geojson_window(geojsonurl):
     return extent
 
 
-def convert_to_l3_products(filenames, pre_commands, post_commands, export_path='L3_data'):
+def convert_to_l3_products(filenames, pre_commands='', post_commands='', export_path='L3_data'):
     """
     Process L2 products and convert to L3 using harpconvert
 
