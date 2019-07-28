@@ -33,7 +33,9 @@ def query_copernicus_hub(aoi=None, username='s5pguest', password='s5pguest', hub
         products = api.query(footprint, **kwargs)
 
     # display results
-    printBold('Results:\n {} products found\n'.format(len(products)))
+    printBold('\nNumber of products found: {number_product}\nTotal products size: {size} MB\n'.format(
+        number_product=len(products),
+        size=sum([float(products[uuid]['size'][:-3]) for uuid in products.keys()])))
 
     return api, products
 

@@ -5,7 +5,6 @@ import argparse
 from os.path import exists
 from os import makedirs
 import warnings
-from getpass import getpass
 
 import xarray as xr
 from dask.diagnostics import ProgressBar
@@ -108,32 +107,11 @@ args = parser.parse_args()
 # ------------- QUERYING & DOWNLOADING PRODUCTS ---------------------
 # -------------------------------------------------------------------
 
-s5p_products = [
-    "L2__O3____",
-    "L2__NO2___",
-    "L2__SO2___",
-    "L2__CO____",
-    "L2__CH4___",
-    "L2__HCHO__",
-    "L2__AER_AI",
-    "L2__CLOUD_"
-]
+DHUS_USER = 's5pguest'
+DHUS_PASSWORD = 's5pguest'
+DHUS_URL = 'https://s5phub.copernicus.eu/dhus'
 
-# Credentials
-if args.platform == 'Sentinel-5 Precursor' or args.product in s5p_products:
-    DHUS_USER = 's5pguest'
-    DHUS_PASSWORD = 's5pguest'
-    DHUS_URL = 'https://s5phub.copernicus.eu/dhus'
-
-    FIX_EXTENSION = True
-
-else:
-    DHUS_USER = input('username: ')
-    DHUS_PASSWORD = getpass('password: ')
-    DHUS_URL = 'https://scihub.copernicus.eu/dhus'
-
-    FIX_EXTENSION = False
-
+FIX_EXTENSION = True
 
 printCyan('\nRequest products\n')
 
@@ -167,7 +145,7 @@ L2_files_urls = get_filenames_request(products, '{dir}/{product_dir}'.format(dir
                                                                              product_dir=args.product))
 
 
-if (args.platform == 'Sentinel-5 Precursor' or args.product in s5p_products) and len(L2_files_urls) > 0:
+if len(L2_files_urls) > 0:
 
     # -------------------------------------------------------------------
     # ----------------------- PREPROCESS DATA ---------------------------
