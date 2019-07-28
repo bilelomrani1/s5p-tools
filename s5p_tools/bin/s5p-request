@@ -8,7 +8,6 @@ import warnings
 from getpass import getpass
 
 import xarray as xr
-import pandas as pd
 from dask.diagnostics import ProgressBar
 
 from s5p_tools.s5p_tools import geojson_window, convert_to_l3_products, request_copernicus_hub, get_filenames_request, make_country_mask
@@ -183,44 +182,59 @@ if (args.platform == 'Sentinel-5 Precursor' or args.product in s5p_products) and
     harp_commands = {
 
         'L2__NO2___': ('tropospheric_NO2_column_number_density_validity>50;'
+                       'tropospheric_NO2_column_number_density>=0;'
+                       'NO2_column_number_density>=0;'
+                       'stratospheric_NO2_column_number_density>=0;'
+                       'NO2_slant_column_number_density>=0;'
                        'derive(tropospheric_NO2_column_number_density [{unit}]);'
                        'derive(stratospheric_NO2_column_number_density [{unit}]);'
                        'derive(NO2_column_number_density [{unit}]);'
                        'derive(NO2_slant_column_number_density [{unit}])').format(unit=args.unit),
 
         'L2__O3____': ('O3_column_number_density_validity>50;'
-                       'derive(O3_column_number_density [{unit}]);'
-                       'derive(O3_slant_column_number_density [{unit}])').format(unit=args.unit),
+                       'O3_column_number_density>=0;'
+                       'derive(O3_column_number_density [{unit}])').format(unit=args.unit),
 
         'L2__SO2___': ('SO2_column_number_density_validity>50;'
+                       'SO2_column_number_density>=0;'
+                       'SO2_slant_column_number_density>=0;'
+                       'O3_column_number_density>=0;'
                        'derive(SO2_column_number_density [{unit}]);'
-                       'derive(SO2_slant_column_number_density [{unit}])').format(unit=args.unit),
+                       'derive(SO2_slant_column_number_density [{unit}]);'
+                       'derive(O3_column_number_density [{unit}])').format(unit=args.unit),
 
         'L2__HCHO__': ('tropospheric_HCHO_column_number_density_validity>50;'
+                       'tropospheric_HCHO_column_number_density>=0;'
+                       'HCHO_slant_column_number_density>=0;'
                        'derive(tropospheric_HCHO_column_number_density [{unit}]);'
                        'derive(HCHO_slant_column_number_density [{unit}])').format(unit=args.unit),
 
         'L2__CO____': ('CO_column_number_density_validity>50;'
+                       'H2O_column_number_density>=0;'
                        'derive(CO_column_number_density [{unit}]);'
                        'derive(H2O_column_number_density [{unit}])').format(unit=args.unit),
 
         'L2__CH4___': ('CH4_column_volume_mixing_ratio_dry_air_validity>50;'
+                       'H2O_column_number_density>=0;'
                        'derive(H2O_column_number_density [{unit}]);'
-                       'derive(dry_air_column_number_density [{unit}]);'
-                       'derive(CH4_column_number_density_apriori [{unit}])').format(unit=args.unit),
+                       'derive(dry_air_column_number_density [{unit}])').format(unit=args.unit),
 
         'L2__AER_AI': ('absorbing_aerosol_index_validity>50').format(unit=args.unit),
 
-        'L2__CLOUD_': ('cloud_fraction_validity>50').format(unit=args.unit)
+        'L2__CLOUD_': ('cloud_fraction_validity>50;'
+                       'cloud_fraction>=0').format(unit=args.unit)
 
     }
-
-    # extent: compute map extent from aoi
-    extent = geojson_window(args.aoi)
 
     # Step size for spatial re-gridding (in degrees)
     LON_STEP = 0.01
     LAT_STEP = 0.01
+
+    if args.aoi is None:
+        extent = [-180, 180, -90, 90]
+    else:
+        # extent: compute map extent from aoi
+        extent = geojson_window(args.aoi)
 
     # computes offsets and number of samples
     lat_edge_length = int(abs(extent[3] - extent[2]) / LAT_STEP + 1)
@@ -248,6 +262,7 @@ if (args.platform == 'Sentinel-5 Precursor' or args.product in s5p_products) and
     L3_product_url = convert_to_l3_products(L2_files_urls, pre_commands, export_path='{dir}/{product_dir}'.format(dir=EXPORT_DIR,
                                             product_dir=args.product.replace('L2', 'L3')))
 
+
     # -------------------------------------------------------------------
     # ------------------ AGGREGRATE PRODUCTS ----------------------------
     # -------------------------------------------------------------------
@@ -258,13 +273,15 @@ if (args.platform == 'Sentinel-5 Precursor' or args.product in s5p_products) and
     xr.set_options(keep_attrs=True)
 
     with ProgressBar():
+
         # open L2 products
         DS = xr.open_mfdataset([filename.replace('L2', 'L3') for filename in L2_files_urls
                                 if exists(filename.replace('L2', 'L3'))], combine='nested', concat_dim='time')
 
-        # create a new coordinate based on datetime_start (year-month-day) -> binning by day
-        DS = DS.assign_coords(time=pd.to_datetime(
-            DS.datetime_start.values).date.astype('datetime64[ns]'))
+        # create a new coordinate time
+        DS = DS.assign_coords(time=DS.datetime_start)
+        DS = DS.drop('datetime_start')
+        DS = DS.sortby('time')
 
         # filter pixels
         if args.shp is not None:
@@ -274,7 +291,6 @@ if (args.platform == 'Sentinel-5 Precursor' or args.product in s5p_products) and
                            if DS[column_name].dims == ('time', 'latitude', 'longitude')]:
                 DS[column] = DS[column].where(mask)
 
-        DS = DS.groupby('time').mean(dim='time')
 
     # -------------------------------------------------------------------
     # ---------------------- EXPORT PRODUCTS ----------------------------
