@@ -96,8 +96,7 @@ parser.add_argument('--command', help='Harp convert command used during import o
 
 
 # Unit: Unit conversion
-parser.add_argument('--unit', help='Unit conversion',
-                    default='molec/m2', type=str)
+parser.add_argument('--unit', help='Unit conversion', type=str)
 
 
 args = parser.parse_args()
@@ -157,50 +156,64 @@ if len(L2_files_urls) > 0:
     # the source data is filtered to remove any values with QA values less than 50 according to Copernicus specifications
     # + binning data by latitude/longitude
 
-    harp_commands = {
+    harp_filter_commands = {
 
         'L2__NO2___': ('tropospheric_NO2_column_number_density_validity>50;'
                        'tropospheric_NO2_column_number_density>=0;'
                        'NO2_column_number_density>=0;'
                        'stratospheric_NO2_column_number_density>=0;'
-                       'NO2_slant_column_number_density>=0;'
-                       'derive(tropospheric_NO2_column_number_density [{unit}]);'
-                       'derive(stratospheric_NO2_column_number_density [{unit}]);'
-                       'derive(NO2_column_number_density [{unit}]);'
-                       'derive(NO2_slant_column_number_density [{unit}])').format(unit=args.unit),
+                       'NO2_slant_column_number_density>=0'),
 
         'L2__O3____': ('O3_column_number_density_validity>50;'
-                       'O3_column_number_density>=0;'
-                       'derive(O3_column_number_density [{unit}])').format(unit=args.unit),
+                       'O3_column_number_density>=0'),
 
         'L2__SO2___': ('SO2_column_number_density_validity>50;'
                        'SO2_column_number_density>=0;'
                        'SO2_slant_column_number_density>=0;'
-                       'O3_column_number_density>=0;'
-                       'derive(SO2_column_number_density [{unit}]);'
-                       'derive(SO2_slant_column_number_density [{unit}]);'
-                       'derive(O3_column_number_density [{unit}])').format(unit=args.unit),
+                       'O3_column_number_density>=0'),
 
         'L2__HCHO__': ('tropospheric_HCHO_column_number_density_validity>50;'
                        'tropospheric_HCHO_column_number_density>=0;'
-                       'HCHO_slant_column_number_density>=0;'
-                       'derive(tropospheric_HCHO_column_number_density [{unit}]);'
-                       'derive(HCHO_slant_column_number_density [{unit}])').format(unit=args.unit),
+                       'HCHO_slant_column_number_density>=0'),
 
         'L2__CO____': ('CO_column_number_density_validity>50;'
-                       'H2O_column_number_density>=0;'
-                       'derive(CO_column_number_density [{unit}]);'
-                       'derive(H2O_column_number_density [{unit}])').format(unit=args.unit),
+                       'H2O_column_number_density>=0'),
 
         'L2__CH4___': ('CH4_column_volume_mixing_ratio_dry_air_validity>50;'
-                       'H2O_column_number_density>=0;'
-                       'derive(H2O_column_number_density [{unit}]);'
-                       'derive(dry_air_column_number_density [{unit}])').format(unit=args.unit),
+                       'H2O_column_number_density>=0'),
 
-        'L2__AER_AI': ('absorbing_aerosol_index_validity>50').format(unit=args.unit),
+        'L2__AER_AI': ('absorbing_aerosol_index_validity>50'),
 
         'L2__CLOUD_': ('cloud_fraction_validity>50;'
-                       'cloud_fraction>=0').format(unit=args.unit)
+                       'cloud_fraction>=0')
+
+    }
+
+    harp_conversion_commands = {
+
+        'L2__NO2___': ('derive(tropospheric_NO2_column_number_density [{unit}]);'
+                       'derive(stratospheric_NO2_column_number_density [{unit}]);'
+                       'derive(NO2_column_number_density [{unit}]);'
+                       'derive(NO2_slant_column_number_density [{unit}])').format(unit=args.unit),
+
+        'L2__O3____': ('derive(O3_column_number_density [{unit}])').format(unit=args.unit),
+
+        'L2__SO2___': ('derive(SO2_column_number_density [{unit}]);'
+                       'derive(SO2_slant_column_number_density [{unit}]);'
+                       'derive(O3_column_number_density [{unit}])').format(unit=args.unit),
+
+        'L2__HCHO__': ('derive(tropospheric_HCHO_column_number_density [{unit}]);'
+                       'derive(HCHO_slant_column_number_density [{unit}])').format(unit=args.unit),
+
+        'L2__CO____': ('derive(CO_column_number_density [{unit}]);'
+                       'derive(H2O_column_number_density [{unit}])').format(unit=args.unit),
+
+        'L2__CH4___': ('derive(H2O_column_number_density [{unit}]);'
+                       'derive(dry_air_column_number_density [{unit}])').format(unit=args.unit),
+
+        'L2__AER_AI': '',
+
+        'L2__CLOUD_': ''
 
     }
 
@@ -221,11 +234,15 @@ if len(L2_files_urls) > 0:
     lon_edge_offset = extent[0]
 
     if args.command is None:
-        conversion_command = harp_commands[args.product]
+        if args.unit is None:
+            harp_commands = '{filter_command}'.format(filter_command=harp_filter_commands[args.product])
+        else:
+            harp_commands = '{filter_command};{conversion_command}'.format(filter_command=harp_filter_commands[args.product],
+                                                                    conversion_command=harp_conversion_commands[args.product])
     else:
-        conversion_command = args.command
+        harp_commands = args.command
 
-    pre_commands = ('{conversion_command};exclude(datetime_length);'
+    pre_commands = ('{harp_commands};exclude(datetime_length);'
                     'bin_spatial({lat_edge_length},{lat_edge_offset},{lat_step},{lon_edge_length},{lon_edge_offset},'
                     '{lon_step});derive(latitude {{latitude}});derive(longitude {{longitude}})').format(
                         lat_edge_length=lat_edge_length,
@@ -234,12 +251,11 @@ if len(L2_files_urls) > 0:
                         lon_edge_length=lon_edge_length,
                         lon_edge_offset=lon_edge_offset,
                         lon_step=LON_STEP,
-                        conversion_command=conversion_command)
+                        harp_commands=harp_commands)
 
     # perform conversion
     L3_product_url = convert_to_l3_products(L2_files_urls, pre_commands, export_path='{dir}/{product_dir}'.format(dir=EXPORT_DIR,
                                             product_dir=args.product.replace('L2', 'L3')))
-
 
     # -------------------------------------------------------------------
     # ------------------ AGGREGRATE PRODUCTS ----------------------------
@@ -264,13 +280,12 @@ if len(L2_files_urls) > 0:
 
     # filter pixels
     with ProgressBar():
-        print('Applying shapefile\n')
         if args.shp is not None:
+            print('\nApplying shapefile\n')
             mask = make_country_mask(args.shp, DS.longitude, DS.latitude)
             for column in [column_name for column_name in list(DS.variables)
                            if DS[column_name].dims == ('time', 'latitude', 'longitude')]:
                 DS[column] = DS[column].where(mask)
-
 
     # -------------------------------------------------------------------
     # ---------------------- EXPORT PRODUCTS ----------------------------

@@ -97,5 +97,4 @@ s5p-request <product-type> --unit <unit>
 
 Unit conversion supports the following arguments:
 - `molec/m2`
-- `kg/m2`
 - `mol/m2`
