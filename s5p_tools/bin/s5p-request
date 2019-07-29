@@ -250,21 +250,23 @@ if len(L2_files_urls) > 0:
     # Avoid lost attributes during conversion
     xr.set_options(keep_attrs=True)
 
+    # open L2 products
+    print('Loading data\n')
     with ProgressBar():
-
-        # open L2 products
         DS = xr.open_mfdataset([filename.replace('L2', 'L3') for filename in L2_files_urls
-                                if exists(filename.replace('L2', 'L3'))], combine='nested', concat_dim='time')
+                                if exists(filename.replace('L2', 'L3'))], combine='nested', concat_dim='time',
+                                chunks={'time': 100})
 
         # create a new coordinate time
         DS = DS.assign_coords(time=DS.datetime_start)
         DS = DS.drop('datetime_start')
         DS = DS.sortby('time')
 
-        # filter pixels
+    # filter pixels
+    with ProgressBar():
+        print('Applying shapefile\n')
         if args.shp is not None:
             mask = make_country_mask(args.shp, DS.longitude, DS.latitude)
-
             for column in [column_name for column_name in list(DS.variables)
                            if DS[column_name].dims == ('time', 'latitude', 'longitude')]:
                 DS[column] = DS[column].where(mask)
