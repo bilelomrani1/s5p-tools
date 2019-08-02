@@ -29,20 +29,20 @@ s5p-request <product-type>
 ```
 where `<product-type>` is a Sentinel-5P product. TROPOMI Level 2 geophysical products are given in the table below.
 
-| Product type          | Parameter                                              |
-|-----------------------|--------------------------------------------------------|
-| L2__O3____            | Ozone (O3) total column                                |
-| L2__NO2___            | Nitrogen Dioxide (NO2), tropospheric column            |
-| L2__SO2___            | Sulfur Dioxide (SO2) total column                      |
-| L2__CO____            | Carbon Monoxide (CO) total column                      |
-| L2__CH4___            | Methane (CH4) total column                             |
-| L2__HCHO__            | Formaldehyde (HCHO) total column                       |
-| L2__AER_AI            | UV Aerosol Index                                       |
-| L2__CLOUD_            | Cloud fraction, albedo, top pressure                   |
+| Product type          | Parameter                                                         |
+|-----------------------|-------------------------------------------------------------------|
+| L2__O3____            | Ozone (O3) total column                                           |
+| L2__NO2___            | Nitrogen Dioxide (NO2), tropospheric, stratospheric, slant column |
+| L2__SO2___            | Sulfur Dioxide (SO2) total column                                 |
+| L2__CO____            | Carbon Monoxide (CO) total column                                 |
+| L2__CH4___            | Methane (CH4) total column                                        |
+| L2__HCHO__            | Formaldehyde (HCHO) tropospheric, slant column                    |
+| L2__AER_AI            | UV Aerosol Index                                                  |
+| L2__CLOUD_            | Cloud fraction, albedo, top pressure                              |
 
-By default, the script downloads the data corresponding to the specified product for the last 24 hours. Custom date query can be specified via the option `--date`.
+By default, the script downloads all products corresponding to the specified product type for the last 24 hours. Custom date query can be specified via the option `--date`.
 
-The resulting file is a `netCDF` file in the `processed` folder, binned by time, latitude, longitude, aligned on the same L3 grid. The products are grouped by day.
+The resulting file is a `netCDF` file in the `processed` folder, binned by time, latitude, longitude, aligned on the same regular grid with resolution 0.01 x 0.01 arc degree.
 
 ### Options
 
@@ -81,7 +81,7 @@ The option `--shp` allows to mask the resulting final dataset based on the geome
 s5p-request <product-type> --shp <shapefile-file-url>
 ```
 
-The script expects a shapefile encoded in `utf-8` and projected with Longitude / Latitude WGS84 projection. To standardize your `.shp` file, use the following `ogr2ogr` command from GDAL:
+If the shapefile contains more than one geometry, the script considers the union of all geometries. The script expects a shapefile encoded in `utf-8` and projected with Longitude / Latitude WGS84 projection. To standardize your `.shp` file, use the following `ogr2ogr` command from GDAL:
 
 ```bash
 ogr2ogr -f "ESRI Shapefile" -lco ENCODING=UTF-8 -t_srs EPSG:4326 output.shp input.shp
@@ -89,12 +89,12 @@ ogr2ogr -f "ESRI Shapefile" -lco ENCODING=UTF-8 -t_srs EPSG:4326 output.shp inpu
 
 #### Unit conversion
 
-By default, all products are converted in `molec/m2` (except `L2__CH4___`, `L2__AER_AI`, `L2__CLOUD_`). To specify a custom unit conversion, use the option `--unit`.
+By default, no unit conversion is performed (SI units). To specify a custom unit conversion, use the option `--unit`.
 
 ```bash
 s5p-request <product-type> --unit <unit>
 ```
 
-Unit conversion supports the following arguments:
+Unit conversion supports the following arguments for densities:
 - `molec/m2`
-- `mol/m2`
+- `mol/m2` (default)

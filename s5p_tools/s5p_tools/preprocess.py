@@ -100,7 +100,7 @@ def convert_to_l3_products(filenames, pre_commands='', post_commands='', export_
 
 def make_country_mask(shapefile_url, lons, lats):
     """
-    Create a mask filtering pixels outside a given country
+    Create a mask filtering pixels outside a given shapefile
 
     :param shapefile_url: (str) Url to shapefile
     :param lons: (DataArray) Xarray of longitudes

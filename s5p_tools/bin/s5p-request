@@ -26,20 +26,6 @@ CHECKSUM = True
 
 
 # -------------------------------------------------------------------
-# ------------------------------ PATHS ------------------------------
-# -------------------------------------------------------------------
-
-# download_directory: directory for L2 products
-DOWNLOAD_DIR = 'L2_data'
-
-# export_directory: directory for L3 products
-EXPORT_DIR = 'L3_data'
-
-# processed_directory: directory for processed products (aggregated+masked)
-PROCESSED_DIR = 'processed'
-
-
-# -------------------------------------------------------------------
 # ------------------------- PARSE ARGUMENTS -------------------------
 # -------------------------------------------------------------------
 
@@ -103,6 +89,20 @@ args = parser.parse_args()
 
 
 # -------------------------------------------------------------------
+# ------------------------------ PATHS ------------------------------
+# -------------------------------------------------------------------
+
+# download_directory: directory for L2 products
+DOWNLOAD_DIR = 'L2_data'
+
+# export_directory: directory for L3 products
+EXPORT_DIR = 'L3_data'
+
+# processed_directory: directory for processed products (aggregated+masked)
+PROCESSED_DIR = 'processed'
+
+
+# -------------------------------------------------------------------
 # ------------- QUERYING & DOWNLOADING PRODUCTS ---------------------
 # -------------------------------------------------------------------
 
@@ -114,30 +114,17 @@ FIX_EXTENSION = True
 
 printCyan('\nRequest products\n')
 
-if args.platform is None:
-    _, products = request_copernicus_hub(login=DHUS_USER,
-                                         password=DHUS_PASSWORD,
-                                         hub=DHUS_URL,
-                                         aoi=args.aoi,
-                                         date=tuple(args.date),
-                                         producttype=args.product,
-                                         download_directory='{dir}/{product_dir}'.format(dir=DOWNLOAD_DIR,
-                                                                                         product_dir=args.product),
-                                         checksum=CHECKSUM,
-                                         fix_extension=FIX_EXTENSION)
-
-else:
-    _, products = request_copernicus_hub(login=DHUS_USER,
-                                         password=DHUS_PASSWORD,
-                                         hub=DHUS_URL,
-                                         aoi=args.aoi,
-                                         date=tuple(args.date),
-                                         platformname=args.platform,
-                                         producttype=args.product,
-                                         download_directory='{dir}/{product_dir}'.format(dir=DOWNLOAD_DIR,
-                                                                                         product_dir=args.product),
-                                         checksum=CHECKSUM,
-                                         fix_extension=FIX_EXTENSION)
+_, products = request_copernicus_hub(login=DHUS_USER,
+                                    password=DHUS_PASSWORD,
+                                    hub=DHUS_URL,
+                                    aoi=args.aoi,
+                                    date=tuple(args.date),
+                                    platformname='Sentinel-5 Precursor',
+                                    producttype=args.product,
+                                    download_directory='{dir}/{product_dir}'.format(dir=DOWNLOAD_DIR,
+                                                                                    product_dir=args.product),
+                                    checksum=CHECKSUM,
+                                    fix_extension=FIX_EXTENSION)
 
 
 L2_files_urls = get_filenames_request(products, '{dir}/{product_dir}'.format(dir=DOWNLOAD_DIR,
@@ -270,7 +257,7 @@ if len(L2_files_urls) > 0:
     print('Loading data\n')
     with ProgressBar():
         DS = xr.open_mfdataset([filename.replace('L2', 'L3') for filename in L2_files_urls
-                                if exists(filename.replace('L2', 'L3'))], combine='nested', concat_dim='time',
+                                if exists(filename.replace('L2', 'L3'))], combine='by_coords', concat_dim='time',
                                 chunks={'time': 100})
 
         # create a new coordinate time
@@ -291,7 +278,7 @@ if len(L2_files_urls) > 0:
     # ---------------------- EXPORT PRODUCTS ----------------------------
     # -------------------------------------------------------------------
 
-    printCyan('\nExport data...\n')
+    printCyan('\nExport dataset\n')
 
     start = min([products[uuid]['beginposition'] for uuid in products.keys()])
     end = max([products[uuid]['endposition'] for uuid in products.keys()])
