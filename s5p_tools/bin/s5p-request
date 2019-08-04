@@ -255,15 +255,16 @@ if len(L2_files_urls) > 0:
 
     # open L2 products
     print('Loading data\n')
+
+    def preprocess(ds):
+        ds = ds.assign_coords(time=ds.datetime_start)
+        ds = ds.drop(['datetime_start', 'orbit_index'])
+        return ds
+
     with ProgressBar():
         DS = xr.open_mfdataset([filename.replace('L2', 'L3') for filename in L2_files_urls
-                                if exists(filename.replace('L2', 'L3'))], combine='by_coords', concat_dim='time',
-                                chunks={'time': 100})
-
-        # create a new coordinate time
-        DS = DS.assign_coords(time=DS.datetime_start)
-        DS = DS.drop('datetime_start')
-        DS = DS.sortby('time')
+                                if exists(filename.replace('L2', 'L3'))], combine='by_coords', 
+                                preprocess=lambda ds: preprocess(ds), chunks={'time': 100})
 
     # filter pixels
     with ProgressBar():
