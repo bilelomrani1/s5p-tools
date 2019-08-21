@@ -258,7 +258,7 @@ if len(L2_files_urls) > 0:
 
     def preprocess(ds):
         ds = ds.assign_coords(time=ds.datetime_start)
-        ds = ds.drop(['datetime_start', 'orbit_index'])
+        ds = ds.drop('datetime_start')
         return ds
 
     with ProgressBar():
