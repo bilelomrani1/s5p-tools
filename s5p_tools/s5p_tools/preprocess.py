@@ -78,21 +78,19 @@ def convert_to_l3_products(filenames, pre_commands='', post_commands='', export_
         if not exists("{export_path}/{name}".format(export_path=export_path,
                                                     name=filename.split('/')[-1].replace('L2', 'L3'))):
 
-            print("Converting {filename}".format(filename=filename))
+            print(f"Converting {filename}")
             if exists(filename):
                 try:
-                    output_product = harp.import_product(
-                        filename, operations=pre_commands)
+                    output_product = harp.import_product(filename, operations=pre_commands)
                     export_url = "{export_path}/{name}".format(export_path=export_path,
                                                                name=filename.split('/')[-1].replace('L2', 'L3'))
-                    harp.export_product(
-                        output_product, export_url, file_format='netcdf', operations=post_commands)
+                    harp.export_product(output_product, export_url,
+                                        file_format='netcdf', operations=post_commands)
                 except harp._harppy.NoDataError:
-                    printRed("Exception occured in {filename}: Product contains no variables or variables without data".format(
-                        filename=filename))
+                    printRed(
+                        f"Exception occured in {filename}: Product contains no variables or variables without data")
             else:
-                printRed('File {filename} not found'.format(
-                    filename=filename))
+                printRed(f'File {filename} not found')
         else:
             print("File {export_path}/{name} already exists".format(
                 export_path=export_path, name=filename.split('/')[-1].replace('L2', 'L3')))

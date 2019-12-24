@@ -4,6 +4,7 @@ Set of tools to query Copernicus database.
 
 from os import listdir, rename, makedirs
 from os.path import exists
+import concurrent.futures
 
 from sentinelsat.sentinel import SentinelAPI, read_geojson, geojson_to_wkt, InvalidChecksumError, SentinelAPIError
 from ..pretty_print import printBold, printCyan, printRed
@@ -40,47 +41,6 @@ def query_copernicus_hub(aoi=None, username='s5pguest', password='s5pguest', hub
     return api, products
 
 
-def download_copernicus_hub(products, username='s5pguest', password='s5pguest', hub='https://s5phub.copernicus.eu/dhus',
-                            download_directory='L2_data', checksum=True, fix_extension=True):
-    """
-    Download products from Copernicus Hub.
-
-    :param products: (dict) Copernicus Hub query
-    :param username: (str) Username to use for API connection
-    :param password: (str) Password to use for API connection
-    :param hub: (str) Url of hub to query
-    :param download_directory: (str) Url of folder for downloaded products
-    :param checksum: (bool) Verify product integrity after download
-    :param fix_extension: (bool) Fix extension from .zip to .nc (see https://github.com/sentinelsat/sentinelsat/issues/270)
-    :return: (SentinelAPI, dict) API object and results of download
-    """
-
-    # connect to the API
-    api = SentinelAPI(username, password, hub)
-
-    # download products
-    makedirs(download_directory, exist_ok=True)
-    download_res, _, _ = api.download_all(
-        products, directory_path=download_directory, checksum=checksum)
-
-    # list of id's per requested products
-    ids_download = list(download_res.keys())
-
-    if fix_extension:
-        # fix .zip extention
-        for file_id in ids_download:
-            if exists("{download_directory}/{name}.zip".format(download_directory=download_directory,
-                                                               name=download_res[file_id]['title'])):
-                rename("{download_directory}/{name}.zip".format(download_directory=download_directory,
-                                                                name=download_res[file_id]['title']),
-                       "{download_directory}/{name}.nc".format(download_directory=download_directory,
-                                                               name=download_res[file_id]['title']))
-
-    printCyan('Done')
-
-    return api, download_res
-
-
 def get_filenames_request(products, download_directory='L2_data'):
     """
     Get local files url corresponding to a Copernicus request (must be already downloaded)
@@ -94,8 +54,7 @@ def get_filenames_request(products, download_directory='L2_data'):
     ids_request = list(products.keys())
 
     # list of downloaded filenames urls
-    filenames = ["{download_directory}/{name}.nc".format(download_directory=download_directory,
-                                                         name=products[file_id]['title']) for file_id in ids_request]
+    filenames = [f"{download_directory}/{products[file_id]['title']}.nc" for file_id in ids_request]
 
     return filenames
 
@@ -121,36 +80,30 @@ def request_copernicus_hub(aoi=None, login='s5pguest', password='s5pguest', hub=
     makedirs(download_directory, exist_ok=True)
 
     for file_id in ids_request:
-        if not exists("{download_directory}/{name}.nc".format(download_directory=download_directory,
-                                                              name=products[file_id]['title'])):
+
+        if not exists(f"{download_directory}/{products[file_id]['title']}.nc"):
 
             # file not already downloaded
-            print(("File {name} not found. "
-                   "Downloading into {download_directory}").format(name=file_id, download_directory=download_directory))
-
+            print(f"File {file_id} not found. Downloading into {download_directory}")
             try:
                 api.get_product_odata(file_id)
             except SentinelAPIError:
-                printRed(
-                    "Error: File {name} not found in Hub. Skipping".format(name=file_id))
+                printRed(f"Error: File {file_id} not found in Hub. Skipping")
             else:
-                while True:    
+                while True:
                     try:
-                        api.download(
-                            file_id, directory_path=download_directory, checksum=checksum)
+                        api.download(file_id, directory_path=download_directory, checksum=checksum)
                     except InvalidChecksumError:
                         printRed("Invalid Checksum Error. Trying again...")
                         continue
                     else:
                         # fix .zip extention
                         if fix_extension:
-                            rename("{download_directory}/{name}.zip".format(download_directory=download_directory,
-                                                                            name=products[file_id]['title']),
-                                "{download_directory}/{name}.nc".format(download_directory=download_directory,
-                                                                        name=products[file_id]['title']))
+                            rename(f"{download_directory}/{products[file_id]['title']}.zip",
+                                   f"{download_directory}/{products[file_id]['title']}.nc")
                         break
 
         else:
-            print("File {name} already exists".format(name=file_id))
+            print(f"File {file_id} already exists")
 
     return api, products

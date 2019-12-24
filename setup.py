@@ -7,7 +7,8 @@ requirements = [
     'seaborn',
     'shapely',
     'dask',
-    'sentinelsat'
+    'sentinelsat',
+    'toolz'
 ]
 
 long_description = """
