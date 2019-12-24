@@ -7,6 +7,7 @@ from os import makedirs
 import warnings
 
 import xarray as xr
+import numpy as np
 from dask.diagnostics import ProgressBar
 
 from s5p_tools.s5p_tools import geojson_window, convert_to_l3_products, request_copernicus_hub, get_filenames_request, make_country_mask
@@ -270,6 +271,17 @@ if len(L2_files_urls) > 0:
         dir=EXPORT_DIR, product_dir=args.product.replace('L2', 'L3')))
 
     # -------------------------------------------------------------------
+    # ------------------- RECOVER ATTRIBUTES ----------------------------
+    # -------------------------------------------------------------------
+
+    attributes = {
+        filename.split('/')[-1]: {
+            'time_coverage_start': xr.open_dataset(filename).attrs['time_coverage_start'],
+            'time_coverage_end': xr.open_dataset(filename).attrs['time_coverage_end'],
+        } for filename in L2_files_urls
+    }
+
+    # -------------------------------------------------------------------
     # ------------------ AGGREGRATE PRODUCTS ----------------------------
     # -------------------------------------------------------------------
 
@@ -282,6 +294,8 @@ if len(L2_files_urls) > 0:
     print('Loading data\n')
 
     def preprocess(ds):
+        ds['datetime_start'] = xr.DataArray(
+            np.array([attributes[ds.attrs['source_product']]['time_coverage_start']]), dims=['time'])
         ds = ds.assign_coords(time=ds.datetime_start)
         ds = ds.drop('datetime_start')
         return ds
