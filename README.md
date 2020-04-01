@@ -98,3 +98,25 @@ s5p-request <product-type> --unit <unit>
 Unit conversion supports the following arguments for densities:
 - `molec/m2`
 - `mol/m2` (default)
+
+## Acknowledgements
+
+The authors are grateful to the Luxembourg Institute of Socio-Economic Research (LISER) for funding this project. The authors would also like to acknowledge the European Spatial Agency for providing the API for the Sentinel 5P Hub. The content is solely the responsibility of the authors and does not necessarily represent the official views of the LISER.
+
+If you use this code, please consider citing the following paper.
+
+```
+@article{OMRANI2020105089,
+title = "Spatio-temporal data on the air pollutant nitrogen dioxide derived from Sentinel satellite for France",
+journal = "Data in Brief",
+volume = "28",
+pages = "105089",
+year = "2020",
+issn = "2352-3409",
+doi = "https://doi.org/10.1016/j.dib.2019.105089",
+url = "http://www.sciencedirect.com/science/article/pii/S2352340919314453",
+author = "Hichem Omrani and Bilel Omrani and Benoit Parmentier and Marco Helbich",
+keywords = "Air pollution, Remote sensing, Monitoring",
+abstract = "Monitoring of air pollution is an important task in public health. Availability of data is often hindered by the paucity of the ground monitoring station network. We present here a new spatio-temporal dataset collected and processed from the Sentinel 5P remote sensing platform. As an example application, we applied the full workflow to process measurements of nitrogen dioxide (NO2) collected over the territory of mainland France from May 2018 to June 2019. The data stack generated is daily measurements at a 4 × 7 km spatial resolution. The supplementary Python code package used to collect and process the data is made publicly available. The dataset provided in this article is of value for policy-makers and health assessment."
+}
+```
