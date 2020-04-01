@@ -8,6 +8,7 @@ import warnings
 
 import xarray as xr
 import numpy as np
+import pandas as pd
 from dask.diagnostics import ProgressBar
 
 from s5p_tools.s5p_tools import geojson_window, convert_to_l3_products, request_copernicus_hub, get_filenames_request, make_country_mask
@@ -294,16 +295,15 @@ if len(L2_files_urls) > 0:
     print('Loading data\n')
 
     def preprocess(ds):
-        ds['datetime_start'] = xr.DataArray(
-            np.array([attributes[ds.attrs['source_product']]['time_coverage_start']]), dims=['time'])
-        ds = ds.assign_coords(time=ds.datetime_start)
-        ds = ds.drop('datetime_start')
+        ds['time'] = pd.to_datetime(
+            np.array([attributes[ds.attrs['source_product']]['time_coverage_start']])).values
         return ds
 
     with ProgressBar():
         DS = xr.open_mfdataset([filename.replace('L2', 'L3') for filename in L2_files_urls
                                 if exists(filename.replace('L2', 'L3'))], combine='nested',
                                 concat_dim='time', preprocess=preprocess, chunks={'time': 100})
+        DS = DS.sortby('time')
 
     # filter pixels
     with ProgressBar():

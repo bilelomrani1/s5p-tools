@@ -3,6 +3,7 @@ import versioneer
 
 requirements = [
     'cartopy',
+    'pandas',
     'xarray',
     'seaborn',
     'shapely',
