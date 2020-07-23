@@ -1,31 +1,28 @@
-[![Build Status](https://travis-ci.com/bilelomrani1/s5p_tools.svg?branch=master)](https://travis-ci.com/bilelomrani/s5p_tools)
 [![License](https://img.shields.io/github/license/bilelomrani1/s5p-tools.svg)](https://img.shields.io/github/license/bilelomrani1/s5p-tools.svg)
 
 S5P-Tools
 =====================================
 
-A Python package to download, preprocess and plot data from [Copernicus Open Access Hub](https://scihub.copernicus.eu). This implementation is based on `sentinelsat` [package](https://github.com/sentinelsat/sentinelsat) and the [API Hub Access](https://scihub.copernicus.eu/twiki/do/view/SciHubWebPortal/APIHubDescription) to query the database. The preprocess is made with [HARP tools](https://cdn.rawgit.com/stcorp/harp/master/doc/html/harpconvert.html).
+A Python script to download and preprocess data from [Copernicus Open Access Hub](https://scihub.copernicus.eu). This implementation is based on `sentinelsat` [package](https://github.com/sentinelsat/sentinelsat) and the [API Hub Access](https://scihub.copernicus.eu/twiki/do/view/SciHubWebPortal/APIHubDescription) to query the database. The preprocessing is made with [HARP tools](https://cdn.rawgit.com/stcorp/harp/master/doc/html/harpconvert.html).
 
 ## Installation
 
-The package can be installed via the following `conda` commands
+The dependencies can be installed with the following commands.
 
 ```bash
-conda config --add channels conda-forge
 conda config --add channels stcorp
-conda config --add channels bilelomrani
-
-conda install -c conda-forge -c stcorp -c bilelomrani s5p_tools
+conda install -c stcorp -c conda-forge cartopy dask harp
+pip install -r requirements.txt
 ```
 
 ## Downloading and processing data
 
 ### Quick start
 
-The command `s5p-request` is used to query Copernicus Hub, download and process the data. The syntax is the following
+The script `s5p-request.py` is used to query Copernicus Hub, download and process the data. The syntax is the following:
 
 ```bash
-s5p-request <product-type>
+python s5p-request.py <product-type>
 ```
 where `<product-type>` is a Sentinel-5P product. TROPOMI Level 2 geophysical products are given in the table below.
 
@@ -42,18 +39,18 @@ where `<product-type>` is a Sentinel-5P product. TROPOMI Level 2 geophysical pro
 
 By default, the script downloads all products corresponding to the specified product type for the last 24 hours. Custom date query can be specified via the option `--date`.
 
-The resulting file is a `netCDF` file in the `processed` folder, binned by time, latitude, longitude, aligned on the same regular grid with resolution 0.01 x 0.01 arc degree.
+The resulting file is a `netCDF` file in the `processed` folder, binned by time, latitude, longitude, aligned on the same regular grid with resolution 0.01 x 0.01 arc degree. For parsing and plotting, we recommend the Python package `xarray`. An example of preliminary analysis can be found in the repo [s5p-analysis](https://github.com/bilelomrani1/s5p-analysis).
 
 ### Options
 
-The script `s5p-request` supports the following optional arguments:
+The script `python s5p-request.py` supports the following optional arguments:
 
 #### Date
 
 The option `--date` allows to specify a custom time range:
 
 ```bash
-s5p-request <product-type> --date <timestamp> <timestamp>
+python s5p-request.py <product-type> --date <timestamp> <timestamp>
 ```
 where `<timestamp>` can be expressed in one of the following formats:
   - yyyyMMdd
@@ -70,15 +67,16 @@ where `<timestamp>` can be expressed in one of the following formats:
 The option `--aoi` allows to specify a custom geographical area with a `geojson` file.
 
 ```bash
-s5p-request <product-type> --aoi <geojson-file-url>
+python s5p-request.py <product-type> --aoi <geojson-file-url>
 ```
+You can use [geoJSON.io](http://geojson.io) to generate a custom `.geojson` file for your area of interest.
 
 #### Shapefile
 
-The option `--shp` allows to mask the resulting final dataset based on the geometry contained in a `.shp` shapefile.
+The option `--shp` allows to mask the resulting dataset based on the geometry contained in a `.shp` shapefile.
 
 ```bash
-s5p-request <product-type> --shp <shapefile-file-url>
+python s5p-request.py <product-type> --shp <shapefile-file-url>
 ```
 
 If the shapefile contains more than one geometry, the script considers the union of all geometries. The script expects a shapefile encoded in `utf-8` and projected with Longitude / Latitude WGS84 projection. To standardize your `.shp` file, use the following `ogr2ogr` command from GDAL:
@@ -92,12 +90,20 @@ ogr2ogr -f "ESRI Shapefile" -lco ENCODING=UTF-8 -t_srs EPSG:4326 output.shp inpu
 By default, no unit conversion is performed (SI units). To specify a custom unit conversion, use the option `--unit`.
 
 ```bash
-s5p-request <product-type> --unit <unit>
+python s5p-request.py <product-type> --unit <unit>
 ```
 
 Unit conversion supports the following arguments for densities:
 - `molec/m2`
 - `mol/m2` (default)
+
+#### Quality value filtering
+
+By default, the script filters all values whose quality value is below 50. This behavior can be adjusted with the option `--qv`.
+
+```bash
+python s5p-request.py <product-type> --qv <int>
+```
 
 ## Acknowledgements
 

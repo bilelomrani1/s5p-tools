@@ -4,13 +4,16 @@ Set of tools to query Copernicus database.
 
 from os import listdir, rename, makedirs
 from os.path import exists
-import concurrent.futures
+from multiprocessing.pool import ThreadPool
 
 from sentinelsat.sentinel import SentinelAPI, read_geojson, geojson_to_wkt, InvalidChecksumError, SentinelAPIError
-from ..pretty_print import printBold, printCyan, printRed
 
 
-def query_copernicus_hub(aoi=None, username='s5pguest', password='s5pguest', hub='https://s5phub.copernicus.eu/dhus', **kwargs):
+def query_copernicus_hub(aoi=None,
+                         username='s5pguest',
+                         password='s5pguest',
+                         hub='https://s5phub.copernicus.eu/dhus',
+                         **kwargs):
     """
     Query Copernicus Open access Hub.
 
@@ -34,9 +37,9 @@ def query_copernicus_hub(aoi=None, username='s5pguest', password='s5pguest', hub
         products = api.query(footprint, **kwargs)
 
     # display results
-    printBold('Number of products found: {number_product}\nTotal products size: {size} MB\n'.format(
-        number_product=len(products),
-        size=sum([float(products[uuid]['size'][:-3]) for uuid in products.keys()])))
+    print(('Number of products found: {number_product}\n'
+           'Total products size: {size:.2f} MB\n').format(number_product=len(products),
+                                                      size=sum([float(products[uuid]['size'][:-3]) for uuid in products.keys()])))
 
     return api, products
 
@@ -54,13 +57,21 @@ def get_filenames_request(products, download_directory='L2_data'):
     ids_request = list(products.keys())
 
     # list of downloaded filenames urls
-    filenames = [f"{download_directory}/{products[file_id]['title']}.nc" for file_id in ids_request]
+    filenames = [
+        f"{download_directory}/{products[file_id]['title']}.nc" for file_id in ids_request]
 
     return filenames
 
 
-def request_copernicus_hub(aoi=None, login='s5pguest', password='s5pguest', hub='https://s5phub.copernicus.eu/dhus',
-                           download_directory='L2_data', checksum=True, fix_extension=True, **kwargs):
+def request_copernicus_hub(aoi=None,
+                           login='s5pguest',
+                           password='s5pguest',
+                           hub='https://s5phub.copernicus.eu/dhus',
+                           download_directory='L2_data',
+                           checksum=True,
+                           fix_extension=True,
+                           num_workers=4,
+                           **kwargs):
     """
     Query Copernicus Open access Hub and download automatically files that are not already downloaded.
 
@@ -71,6 +82,7 @@ def request_copernicus_hub(aoi=None, login='s5pguest', password='s5pguest', hub=
     :param download_directory: (str) Url of folder for downloaded products
     :param checksum: (bool) Verify product integrity after download
     :param fix_extension: (bool) Fix extension from .zip to .nc (see https://github.com/sentinelsat/sentinelsat/issues/270)
+    :param num_workers: (int) Number of parallel threads
     :param kwargs: (dict) extra keywords for the api.query function (see https://sentinelsat.readthedocs.io/en/stable/cli.html#sentinelsat)
     :return: (SentinelAPI, dict) API object and results of query
     """
@@ -79,22 +91,22 @@ def request_copernicus_hub(aoi=None, login='s5pguest', password='s5pguest', hub=
     ids_request = list(products.keys())
     makedirs(download_directory, exist_ok=True)
 
-    for file_id in ids_request:
-
+    def _fetch_product(file_id):
         if not exists(f"{download_directory}/{products[file_id]['title']}.nc"):
-
             # file not already downloaded
-            print(f"File {file_id} not found. Downloading into {download_directory}")
+            print(f"\tFile {file_id} not found. Downloading into {download_directory}")
             try:
                 api.get_product_odata(file_id)
             except SentinelAPIError:
-                printRed(f"Error: File {file_id} not found in Hub. Skipping")
+                print(f"\tError: File {file_id} not found in Hub. Skipping")
             else:
                 while True:
                     try:
-                        api.download(file_id, directory_path=download_directory, checksum=checksum)
+                        api.download(file_id,
+                                     directory_path=download_directory,
+                                     checksum=checksum)
                     except InvalidChecksumError:
-                        printRed("Invalid Checksum Error. Trying again...")
+                        print("\tInvalid Checksum Error. Trying again...")
                         continue
                     else:
                         # fix .zip extention
@@ -104,6 +116,14 @@ def request_copernicus_hub(aoi=None, login='s5pguest', password='s5pguest', hub=
                         break
 
         else:
-            print(f"File {file_id} already exists")
+            print(f"\tFile {file_id} already exists")
+
+        return None
+
+    print(f"Launched {num_workers} threads")
+    pool = ThreadPool(num_workers)
+    pool.imap_unordered(_fetch_product, ids_request)
+    pool.close()
+    pool.join()
 
     return api, products

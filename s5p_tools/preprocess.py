@@ -10,8 +10,7 @@ from itertools import product
 import cartopy.io.shapereader as shpreader
 import shapely.vectorized
 from shapely.ops import cascaded_union
-
-from ..pretty_print import printRed, printCyan, printBold
+from joblib import Parallel, delayed
 
 
 def _geojson_coordinates(geojsonurl):
@@ -61,7 +60,7 @@ def geojson_window(geojsonurl):
     return extent
 
 
-def convert_to_l3_products(filenames, pre_commands='', post_commands='', export_path='L3_data'):
+def convert_to_l3_products(filenames, pre_commands='', post_commands='', export_path='L3_data', num_workers=8):
     """
     Process L2 products and convert to L3 using harpconvert
 
@@ -69,31 +68,39 @@ def convert_to_l3_products(filenames, pre_commands='', post_commands='', export_
     :param pre_commands: (str) Harp command used during import of L2 products
     :param post_commands: (str) Harp command used during export of L3 products
     :param export_path: (str) Url of folder for converted products
+    :param num_workers: (int) Number of parallel processes
     """
 
-    makedirs(export_path, exist_ok=True)
-
-    for filename in filenames:
+    def _process_file(filename):
 
         if not exists("{export_path}/{name}".format(export_path=export_path,
                                                     name=filename.split('/')[-1].replace('L2', 'L3'))):
 
-            print(f"Converting {filename}")
+            print(f"\tConverting {filename}")
             if exists(filename):
                 try:
-                    output_product = harp.import_product(filename, operations=pre_commands)
+                    output_product = harp.import_product(filename,
+                                                         operations=pre_commands)
                     export_url = "{export_path}/{name}".format(export_path=export_path,
                                                                name=filename.split('/')[-1].replace('L2', 'L3'))
-                    harp.export_product(output_product, export_url,
-                                        file_format='netcdf', operations=post_commands)
+                    harp.export_product(output_product,
+                                        export_url,
+                                        file_format='netcdf',
+                                        operations=post_commands)
+
                 except harp._harppy.NoDataError:
-                    printRed(
-                        f"Exception occured in {filename}: Product contains no variables or variables without data")
+                    print((f"\tException occured in {filename}: "
+                           "Product contains no variables or variables without data"))
             else:
-                printRed(f'File {filename} not found')
+                print(f'\tFile {filename} not found')
         else:
-            print("File {export_path}/{name} already exists".format(
-                export_path=export_path, name=filename.split('/')[-1].replace('L2', 'L3')))
+            print("\tFile {export_path}/{name} already exists".format(export_path=export_path,
+                                                                      name=filename.split('/')[-1].replace('L2', 'L3')))
+
+    makedirs(export_path, exist_ok=True)
+    print(f"Launched {num_workers} processes")
+    Parallel(n_jobs=num_workers, verbose=10)(delayed(_process_file)(filename)
+                                             for filename in filenames)
 
 
 def make_country_mask(shapefile_url, lons, lats):
