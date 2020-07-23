@@ -180,30 +180,25 @@ harp_keep_commands = {
                    'tropopause_pressure,absorbing_aerosol_index,cloud_fraction,datetime_start,'
                    'longitude,latitude)'),
 
-    'L2__O3____': ('keep(O3_column_number_density,O3_column_number_density_amf, O3_slant_column_number_density,'
-                   'O3_effective_temperature,cloud_fraction,datetime_start)',
-                   'longitude,latitude)'),
+    'L2__O3____': ('keep(O3_column_number_density,O3_column_number_density_amf,O3_slant_column_number_density,'
+                   'O3_effective_temperature,cloud_fraction,datetime_start,longitude,latitude)'),
 
-    'L2__SO2___': ('keep(SO2_column_number_density,SO2_column_number_density_amf, SO2_slant_column_number_density,'
-                   'absorbing_aerosol_index,cloud_fraction,datetime_start)',
-                   'longitude,latitude)'),
+    'L2__SO2___': ('keep(SO2_column_number_density,SO2_column_number_density_amf,SO2_slant_column_number_density,'
+                   'absorbing_aerosol_index,cloud_fraction,datetime_start,longitude,latitude)'),
 
-    'L2__HCHO__': ('keep(tropospheric_HCHO_column_number_density,'
-                   'tropospheric_HCHO_column_number_density_amf,'
-                   'HCHO_slant_column_number_density,cloud_fraction,datetime_start',
-                   'longitude,latitude)'),
+    'L2__HCHO__': ('keep(tropospheric_HCHO_column_number_density,tropospheric_HCHO_column_number_density_amf,'
+                   'HCHO_slant_column_number_density,cloud_fraction,datetime_start,longitude,latitude)'),
 
-    'L2__CO____': ('keep(CO_column_number_density,H2O_column_number_density,cloud_height),datetime_start',
+    'L2__CO____': ('keep(CO_column_number_density,H2O_column_number_density,cloud_height,datetime_start,'
                    'longitude,latitude)'),
 
     'L2__CH4___': ('keep(CH4_column_volume_mixing_ratio_dry_air, aerosol_height,'
-                   'aerosol_optical_depth,datetime_start)',
-                   'longitude,latitude)'),
+                   'aerosol_optical_depth,datetime_start,longitude,latitude)'),
 
     'L2__AER_AI': 'keep(absorbing_aerosol_index,datetime_start,longitude,latitude)',
 
-    'L2__CLOUD_': ('keep(cloud_fraction,cloud_top_pressure,cloud_top_height, cloud_base_pressure,'
-                   'cloud_base_height,cloud_optical_depth,surface_albedo,datetime_start',
+    'L2__CLOUD_': ('keep(cloud_fraction,cloud_top_pressure,cloud_top_height,cloud_base_pressure,'
+                   'cloud_base_height,cloud_optical_depth,surface_albedo,datetime_start,'
                    'longitude,latitude)'),
 
 }
@@ -331,7 +326,8 @@ print('\nExport dataset\n')
 start = min([products[uuid]['beginposition'] for uuid in products.keys()])
 end = max([products[uuid]['endposition'] for uuid in products.keys()])
 makedirs(f'{PROCESSED_DIR}/processed{args.product[2:]}', exist_ok=True)
-file_export_name = (f'{PROCESSED_DIR}/processed{args.product[2:]}/{args.product[4:]}{start.day}-{start.month}-{start.year}'
+file_export_name = (f'{PROCESSED_DIR}/processed{args.product[2:]}/'
+                    f'{args.product[4:]}{start.day}-{start.month}-{start.year}'
                     f'__{end.day}-{end.month}-{end.year}.nc')
 
 DS.to_netcdf(file_export_name)
