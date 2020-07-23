@@ -60,7 +60,7 @@ def geojson_window(geojsonurl):
     return extent
 
 
-def convert_to_l3_products(filenames, pre_commands='', post_commands='', export_path='L3_data', num_workers=8):
+def convert_to_l3_products(filenames, pre_commands='', post_commands='', export_path='L3_data'):
     """
     Process L2 products and convert to L3 using harpconvert
 
@@ -68,7 +68,6 @@ def convert_to_l3_products(filenames, pre_commands='', post_commands='', export_
     :param pre_commands: (str) Harp command used during import of L2 products
     :param post_commands: (str) Harp command used during export of L3 products
     :param export_path: (str) Url of folder for converted products
-    :param num_workers: (int) Number of parallel processes
     """
 
     def _process_file(filename):
@@ -97,9 +96,10 @@ def convert_to_l3_products(filenames, pre_commands='', post_commands='', export_
             print("\tFile {export_path}/{name} already exists".format(export_path=export_path,
                                                                       name=filename.split('/')[-1].replace('L2', 'L3')))
 
+    num_workers = cpu_count()
     makedirs(export_path, exist_ok=True)
     print(f"Launched {num_workers} processes")
-    Parallel(n_jobs=cpu_count(), verbose=10)(delayed(_process_file)(filename)
+    Parallel(n_jobs=num_workers, verbose=10)(delayed(_process_file)(filename)
                                              for filename in filenames)
 
 
