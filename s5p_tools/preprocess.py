@@ -10,7 +10,7 @@ from itertools import product
 import cartopy.io.shapereader as shpreader
 import shapely.vectorized
 from shapely.ops import cascaded_union
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, cpu_count
 
 
 def _geojson_coordinates(geojsonurl):
@@ -99,7 +99,7 @@ def convert_to_l3_products(filenames, pre_commands='', post_commands='', export_
 
     makedirs(export_path, exist_ok=True)
     print(f"Launched {num_workers} processes")
-    Parallel(n_jobs=num_workers, verbose=10)(delayed(_process_file)(filename)
+    Parallel(n_jobs=cpu_count(), verbose=10)(delayed(_process_file)(filename)
                                              for filename in filenames)
 
 
