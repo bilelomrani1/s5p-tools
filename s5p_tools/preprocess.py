@@ -75,7 +75,7 @@ def convert_to_l3_products(filenames, pre_commands='', post_commands='', export_
         if not exists("{export_path}/{name}".format(export_path=export_path,
                                                     name=filename.split('/')[-1].replace('L2', 'L3'))):
 
-            print(f"\tConverting {filename}")
+            print(f"Converting {filename}")
             if exists(filename):
                 try:
                     output_product = harp.import_product(filename,
@@ -88,13 +88,13 @@ def convert_to_l3_products(filenames, pre_commands='', post_commands='', export_
                                         operations=post_commands)
 
                 except harp._harppy.NoDataError:
-                    print((f"\tException occured in {filename}: "
+                    print((f"Exception occured in {filename}: "
                            "Product contains no variables or variables without data"))
             else:
-                print(f'\tFile {filename} not found')
+                print(f'File {filename} not found')
         else:
-            print("\tFile {export_path}/{name} already exists".format(export_path=export_path,
-                                                                      name=filename.split('/')[-1].replace('L2', 'L3')))
+            print("File {export_path}/{name} already exists".format(export_path=export_path,
+                                                                    name=filename.split('/')[-1].replace('L2', 'L3')))
 
     num_workers = cpu_count()
     makedirs(export_path, exist_ok=True)

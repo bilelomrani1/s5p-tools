@@ -39,7 +39,7 @@ def query_copernicus_hub(aoi=None,
     # display results
     print(('Number of products found: {number_product}\n'
            'Total products size: {size:.2f} MB\n').format(number_product=len(products),
-                                                      size=sum([float(products[uuid]['size'][:-3]) for uuid in products.keys()])))
+                                                          size=sum([float(products[uuid]['size'][:-3]) for uuid in products.keys()])))
 
     return api, products
 
@@ -94,11 +94,12 @@ def request_copernicus_hub(aoi=None,
     def _fetch_product(file_id):
         if not exists(f"{download_directory}/{products[file_id]['title']}.nc"):
             # file not already downloaded
-            print(f"\tFile {file_id} not found. Downloading into {download_directory}")
+            print(
+                f"File {file_id} not found. Downloading into {download_directory}")
             try:
                 api.get_product_odata(file_id)
             except SentinelAPIError:
-                print(f"\tError: File {file_id} not found in Hub. Skipping")
+                print(f"Error: File {file_id} not found in Hub. Skipping")
             else:
                 while True:
                     try:
@@ -106,7 +107,7 @@ def request_copernicus_hub(aoi=None,
                                      directory_path=download_directory,
                                      checksum=checksum)
                     except InvalidChecksumError:
-                        print("\tInvalid Checksum Error. Trying again...")
+                        print("Invalid Checksum Error. Trying again...")
                         continue
                     else:
                         # fix .zip extention
@@ -116,7 +117,7 @@ def request_copernicus_hub(aoi=None,
                         break
 
         else:
-            print(f"\tFile {file_id} already exists")
+            print(f"File {file_id} already exists")
 
         return None
 
