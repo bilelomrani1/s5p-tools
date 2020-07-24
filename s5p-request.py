@@ -79,8 +79,8 @@ parser.add_argument('--unit', help='Unit conversion', type=str)
 
 
 # qa value: Quality value threshold
-parser.add_argument('--qv', help='Quality value threshold',
-                    type=int, default=50)
+parser.add_argument('--qa', help='Quality value threshold',
+                    type=int, default=75)
 
 
 args = parser.parse_args()
@@ -142,33 +142,33 @@ print('\nConvert into L3 products\n')
 
 harp_filter_commands = {
 
-    'L2__NO2___': (f'tropospheric_NO2_column_number_density_validity>{args.qv};'
+    'L2__NO2___': (f'tropospheric_NO2_column_number_density_validity>{args.qa};'
                    'tropospheric_NO2_column_number_density>=0;'
                    'NO2_column_number_density>=0;'
                    'stratospheric_NO2_column_number_density>=0;'
                    'NO2_slant_column_number_density>=0'),
 
-    'L2__O3____': (f'O3_column_number_density_validity>{args.qv};'
+    'L2__O3____': (f'O3_column_number_density_validity>{args.qa};'
                    'O3_column_number_density>=0'),
 
-    'L2__SO2___': (f'SO2_column_number_density_validity>{args.qv};'
+    'L2__SO2___': (f'SO2_column_number_density_validity>{args.qa};'
                    'SO2_column_number_density>=0;'
                    'SO2_slant_column_number_density>=0;'
                    'O3_column_number_density>=0'),
 
-    'L2__HCHO__': (f'tropospheric_HCHO_column_number_density_validity>{args.qv};'
+    'L2__HCHO__': (f'tropospheric_HCHO_column_number_density_validity>{args.qa};'
                    'tropospheric_HCHO_column_number_density>=0;'
                    'HCHO_slant_column_number_density>=0'),
 
-    'L2__CO____': (f'CO_column_number_density_validity>{args.qv};'
+    'L2__CO____': (f'CO_column_number_density_validity>{args.qa};'
                    'H2O_column_number_density>=0'),
 
-    'L2__CH4___': (f'CH4_column_volume_mixing_ratio_dry_air_validity>{args.qv};'
+    'L2__CH4___': (f'CH4_column_volume_mixing_ratio_dry_air_validity>{args.qa};'
                    'H2O_column_number_density>=0'),
 
-    'L2__AER_AI': (f'absorbing_aerosol_index_validity>{args.qv}'),
+    'L2__AER_AI': (f'absorbing_aerosol_index_validity>{args.qa}'),
 
-    'L2__CLOUD_': (f'cloud_fraction_validity>{args.qv};'
+    'L2__CLOUD_': (f'cloud_fraction_validity>{args.qa};'
                    'cloud_fraction>=0')
 
 }
