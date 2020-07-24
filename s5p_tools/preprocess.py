@@ -96,7 +96,7 @@ def convert_to_l3_products(filenames, pre_commands='', post_commands='', export_
             print("File {export_path}/{name} already exists".format(export_path=export_path,
                                                                     name=filename.split('/')[-1].replace('L2', 'L3')))
 
-    num_workers = cpu_count()
+    num_workers = min(cpu_count(), len(filenames))
     makedirs(export_path, exist_ok=True)
     print(f"Launched {num_workers} processes")
     Parallel(n_jobs=num_workers, verbose=10)(delayed(_process_file)(filename)
