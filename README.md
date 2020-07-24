@@ -94,6 +94,7 @@ python s5p-request.py <product-type> --unit <unit>
 ```
 
 Unit conversion supports the following arguments for densities:
+- `Pmolec/cm2`
 - `molec/m2`
 - `mol/m2` (default)
 
