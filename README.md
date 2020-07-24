@@ -99,10 +99,10 @@ Unit conversion supports the following arguments for densities:
 
 #### Quality value filtering
 
-By default, the script filters all values whose quality value is below 50. This behavior can be adjusted with the option `--qv`.
+By default, the script filters all values whose quality value is below 75. This behavior can be adjusted with the option `--qa`.
 
 ```bash
-python s5p-request.py <product-type> --qv <int>
+python s5p-request.py <product-type> --qa <int>
 ```
 
 ## Acknowledgements
