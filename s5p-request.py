@@ -268,8 +268,7 @@ else:
 # perform conversion
 convert_to_l3_products(L2_files_urls,
                        pre_commands=pre_commands,
-                       export_path='{dir}/{product_dir}'.format(dir=EXPORT_DIR,
-                                                                product_dir=args.product.replace('L2', 'L3')))
+                       export_path=f"{EXPORT_DIR}/{args.product.replace('L2', 'L3')}")
 
 # -------------------------------------------------------------------
 # ------------------- RECOVER ATTRIBUTES ----------------------------
@@ -321,7 +320,7 @@ if args.shp is not None:
 # ---------------------- EXPORT PRODUCTS ----------------------------
 # -------------------------------------------------------------------
 
-print('\nExport dataset\n')
+print('Export dataset\n')
 
 start = min([products[uuid]['beginposition'] for uuid in products.keys()])
 end = max([products[uuid]['endposition'] for uuid in products.keys()])
@@ -332,4 +331,4 @@ file_export_name = (f'{PROCESSED_DIR}/processed{args.product[2:]}/'
 
 DS.to_netcdf(file_export_name)
 
-print('\nDone\n')
+print('Done\n')

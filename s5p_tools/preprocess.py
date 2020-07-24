@@ -10,7 +10,7 @@ from itertools import product
 import cartopy.io.shapereader as shpreader
 import shapely.vectorized
 from shapely.ops import cascaded_union
-from joblib import Parallel, delayed, cpu_count
+from pathos.multiprocessing import ProcessingPool as Pool, cpu_count
 
 
 def _geojson_coordinates(geojsonurl):
@@ -96,11 +96,15 @@ def convert_to_l3_products(filenames, pre_commands='', post_commands='', export_
             print("File {export_path}/{name} already exists".format(export_path=export_path,
                                                                     name=filename.split('/')[-1].replace('L2', 'L3')))
 
+        return None
+
     num_workers = min(cpu_count(), len(filenames))
     makedirs(export_path, exist_ok=True)
     print(f"Launched {num_workers} processes")
-    Parallel(n_jobs=num_workers, verbose=10)(delayed(_process_file)(filename)
-                                             for filename in filenames)
+    pool = Pool(processes=num_workers)
+    pool.uimap(_process_file, filenames)
+    pool.close()
+    pool.join()
 
 
 def make_country_mask(shapefile_url, lons, lats):
