@@ -122,9 +122,9 @@ def request_copernicus_hub(aoi=None,
         return None
 
     print(f"Launched {num_workers} threads")
-    pool = ThreadPool(num_workers)
-    pool.imap_unordered(_fetch_product, ids_request)
-    pool.close()
-    pool.join()
+    with ThreadPool(num_workers) as pool:
+        pool.imap_unordered(_fetch_product, ids_request)
+        pool.close()
+        pool.join()
 
     return api, products
