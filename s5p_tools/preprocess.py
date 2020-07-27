@@ -101,10 +101,10 @@ def convert_to_l3_products(filenames, pre_commands='', post_commands='', export_
     num_workers = min(cpu_count(), len(filenames))
     makedirs(export_path, exist_ok=True)
     print(f"Launched {num_workers} processes")
-    pool = Pool(processes=num_workers)
-    pool.uimap(_process_file, filenames)
-    pool.close()
-    pool.join()
+    with Pool(processes=num_workers) as pool:
+        pool.uimap(_process_file, filenames)
+        pool.close()
+        pool.join()
 
 
 def make_country_mask(shapefile_url, lons, lats):
