@@ -306,6 +306,7 @@ if __name__ == "__main__":
                         combine='nested',
                         concat_dim='time',
                         preprocess=preprocess,
+                        decode_times=False,
                         chunks={'time': 2000})
     DS = DS.sortby('time')
 
