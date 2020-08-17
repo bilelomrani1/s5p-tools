@@ -312,7 +312,7 @@ if __name__ == "__main__":
 
     # filter pixels
     if args.shp is not None:
-        print('\nApplying shapefile\n')
+        print('Applying shapefile\n')
         mask = make_country_mask(args.shp, DS.longitude, DS.latitude)
         for column in [column_name for column_name in list(DS.variables)
                     if DS[column_name].dims == ('time', 'latitude', 'longitude')]:

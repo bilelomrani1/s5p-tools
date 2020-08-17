@@ -5,6 +5,7 @@ Set of tools to query Copernicus database.
 from os import listdir, rename, makedirs
 from os.path import exists
 from multiprocessing.pool import ThreadPool
+from tqdm import tqdm
 
 from sentinelsat.sentinel import SentinelAPI, read_geojson, geojson_to_wkt, InvalidChecksumError, SentinelAPIError
 
@@ -92,6 +93,9 @@ def request_copernicus_hub(aoi=None,
     makedirs(download_directory, exist_ok=True)
 
     def _fetch_product(file_id):
+        id, file_id = file_id
+        api = SentinelAPI(login, password, hub)
+        api._tqdm = lambda **kwargs: tqdm(**kwargs, position=id, leave=True)
         if not exists(f"{download_directory}/{products[file_id]['title']}.nc"):
             # file not already downloaded
             print(
@@ -123,7 +127,7 @@ def request_copernicus_hub(aoi=None,
 
     print(f"Launched {num_workers} threads")
     with ThreadPool(num_workers) as pool:
-        pool.imap_unordered(_fetch_product, ids_request)
+        pool.imap_unordered(_fetch_product, enumerate(ids_request))
         pool.close()
         pool.join()
 
