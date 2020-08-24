@@ -106,6 +106,14 @@ By default, the script filters all values whose quality value is below 75. This 
 python s5p-request.py <product-type> --qa <int>
 ```
 
+#### Spatial resolution
+
+By default, the script uses a 0.01x0.01 arc degrees resolution grid during the L3 conversion. This resolution can be adjusted with the option `--resolution`. For example, to rather use a 0.1x0.1 arc degrees grid use
+
+```bash
+python s5p-request.py <product-type> --resolution 0.1 0.1
+```
+
 ## Acknowledgements
 
 The authors are grateful to the Luxembourg Institute of Socio-Economic Research (LISER) for funding this project. The authors would also like to acknowledge the European Spatial Agency for providing the API for the Sentinel 5P Hub. The content is solely the responsibility of the authors and does not necessarily represent the official views of the LISER.

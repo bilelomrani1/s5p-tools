@@ -84,6 +84,11 @@ if __name__ == "__main__":
                         type=int, default=75)
 
 
+    # resolution: Spatial resolution in arc degrees
+    parser.add_argument('--resolution', help='Spatial resolution in arc degrees', nargs='+',
+                        type=float, default=(0.01, 0.01))
+
+
     args = parser.parse_args()
 
 
@@ -233,8 +238,7 @@ if __name__ == "__main__":
     }
 
     # Step size for spatial re-gridding (in degrees)
-    LON_STEP = 0.01
-    LAT_STEP = 0.01
+    LON_STEP, LAT_STEP = args.resolution
 
     if args.aoi is None:
         extent = [-180, 180, -90, 90]
