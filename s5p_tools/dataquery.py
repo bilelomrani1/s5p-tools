@@ -39,8 +39,9 @@ def query_copernicus_hub(aoi=None,
 
     # display results
     print(('Number of products found: {number_product}\n'
-           'Total products size: {size:.2f} MB\n').format(number_product=len(products),
-                                                          size=sum([float(products[uuid]['size'][:-3]) for uuid in products.keys()])))
+           'Total products size: {size:.2f} MB\n'
+           ).format(number_product=len(products),
+                    size=sum([float(products[uuid]['size'][:-3]) for uuid in products.keys()])))
 
     return api, products
 
@@ -131,4 +132,5 @@ def request_copernicus_hub(aoi=None,
         pool.close()
         pool.join()
 
+    print("\n")
     return api, products
