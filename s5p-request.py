@@ -3,16 +3,21 @@ from os.path import exists
 from os import makedirs
 import warnings
 
+from tqdm import tqdm
+from pathos.multiprocessing import cpu_count
 import xarray as xr
+import rioxarray
+import geopandas
+from shapely.geometry import mapping
 import numpy as np
 import pandas as pd
 
-from s5p_tools import geojson_window, convert_to_l3_products, request_copernicus_hub, get_filenames_request, make_country_mask
+from s5p_tools import bounding_box, convert_to_l3_products, request_copernicus_hub, get_filenames_request
 
 
-def main(product, aoi, date, qa, unit, resolution, command, shp):
+def main(product, aoi, date, qa, unit, resolution, command, shp, chunk_size, num_threads, num_workers):
 
-    print('Request products\n')
+    tqdm.write('\nRequest products\n')
 
     _, products = request_copernicus_hub(login=DHUS_USER,
                                          password=DHUS_PASSWORD,
@@ -22,51 +27,52 @@ def main(product, aoi, date, qa, unit, resolution, command, shp):
                                          platformname='Sentinel-5 Precursor',
                                          producttype=product,
                                          download_directory=f'{DOWNLOAD_DIR}/{product}',
-                                         checksum=CHECKSUM)
+                                         checksum=CHECKSUM,
+                                         num_threads=num_threads)
 
     L2_files_urls = get_filenames_request(
         products, f'{DOWNLOAD_DIR}/{product}')
 
     if len(L2_files_urls) == 0:
-        print('Done\n')
+        tqdm.write('Done\n')
         exit(0)
 
     # PREPROCESS DATA
 
-    print('Convert into L3 products\n')
+    tqdm.write('Convert into L3 products\n')
 
     # harpconvert commands :
     # the source data is filtered + binning data by latitude/longitude
 
     harp_filter_commands = {
 
-        'L2__NO2___': (f'tropospheric_NO2_column_number_density_validity>{qa};'
+        'L2__NO2___': (f'tropospheric_NO2_column_number_density_validity>={qa};'
                        'tropospheric_NO2_column_number_density>=0;'
                        'NO2_column_number_density>=0;'
                        'stratospheric_NO2_column_number_density>=0;'
                        'NO2_slant_column_number_density>=0'),
 
-        'L2__O3____': (f'O3_column_number_density_validity>{qa};'
+        'L2__O3____': (f'O3_column_number_density_validity>={qa};'
                        'O3_column_number_density>=0'),
 
-        'L2__SO2___': (f'SO2_column_number_density_validity>{qa};'
+        'L2__SO2___': (f'SO2_column_number_density_validity>={qa};'
                        'SO2_column_number_density>=0;'
                        'SO2_slant_column_number_density>=0;'
                        'O3_column_number_density>=0'),
 
-        'L2__HCHO__': (f'tropospheric_HCHO_column_number_density_validity>{qa};'
+        'L2__HCHO__': (f'tropospheric_HCHO_column_number_density_validity>={qa};'
                        'tropospheric_HCHO_column_number_density>=0;'
                        'HCHO_slant_column_number_density>=0'),
 
-        'L2__CO____': (f'CO_column_number_density_validity>{qa};'
+        'L2__CO____': (f'CO_column_number_density_validity>={qa};'
                        'H2O_column_number_density>=0'),
 
-        'L2__CH4___': (f'CH4_column_volume_mixing_ratio_dry_air_validity>{qa};'
+        'L2__CH4___': (f'CH4_column_volume_mixing_ratio_dry_air_validity>={qa};'
                        'H2O_column_number_density>=0'),
 
-        'L2__AER_AI': (f'absorbing_aerosol_index_validity>{qa}'),
+        'L2__AER_AI': (f'absorbing_aerosol_index_validity>={qa}'),
 
-        'L2__CLOUD_': (f'cloud_fraction_validity>{qa};'
+        'L2__CLOUD_': (f'cloud_fraction_validity>={qa};'
                        'cloud_fraction>=0')
 
     }
@@ -135,7 +141,7 @@ def main(product, aoi, date, qa, unit, resolution, command, shp):
     if aoi is None:
         extent = [-180, 180, -90, 90]
     else:
-        extent = geojson_window(aoi)
+        extent = bounding_box(aoi)
 
     # computes offsets and number of samples
     lat_edge_length = int(abs(extent[3] - extent[2]) / lat_step + 1)
@@ -145,6 +151,8 @@ def main(product, aoi, date, qa, unit, resolution, command, shp):
 
     # create HARP commands
     if command is None:
+        pre_commands = ''
+
         if unit is None:
             pre_commands = f'{harp_filter_commands[product]}'
         else:
@@ -155,13 +163,15 @@ def main(product, aoi, date, qa, unit, resolution, command, shp):
                          f'{lon_edge_length},{lon_edge_offset},{lon_step});'
                          f'derive(latitude {{latitude}});derive(longitude {{longitude}});'
                          f'{harp_keep_commands[product]}')
+
     else:
         harp_commands = command
 
     # perform conversion
     convert_to_l3_products(L2_files_urls,
                            pre_commands=harp_commands,
-                           export_path=f"{EXPORT_DIR}/{product.replace('L2', 'L3')}")
+                           export_path=f"{EXPORT_DIR}/{product.replace('L2', 'L3')}",
+                           num_workers=num_workers)
 
     # Recover attributes
     attributes = {
@@ -173,7 +183,7 @@ def main(product, aoi, date, qa, unit, resolution, command, shp):
 
     # AGGREGATE DATASET
 
-    print('Process data\n')
+    tqdm.write('Process data\n')
 
     # Avoid lost attributes during conversion
     xr.set_options(keep_attrs=True)
@@ -189,20 +199,24 @@ def main(product, aoi, date, qa, unit, resolution, command, shp):
                            concat_dim='time',
                            preprocess=preprocess,
                            decode_times=False,
-                           chunks={'time': 2000})
+                           chunks={'time': chunk_size})
     DS = DS.sortby('time')
+    DS.rio.write_crs("epsg:4326", inplace=True)
+    DS.rio.set_spatial_dims(x_dim='longitude', y_dim='latitude', inplace=True)
+    DS = DS.drop_vars('datetime_start')
 
-    # filter pixels
+    # APPLY SHAPEFILE
+
     if shp is not None:
-        print('Applying shapefile\n')
-        mask = make_country_mask(shp, DS.longitude, DS.latitude)
-        for column in [column_name for column_name in list(DS.variables)
-                       if DS[column_name].dims == ('time', 'latitude', 'longitude')]:
-            DS[column] = DS[column].where(mask)
+        tqdm.write("Applying shapefile\n")
+        shapefile = geopandas.read_file(shp).to_crs("EPSG:4326")
+        shapefile.geometry = shapefile.geometry.simplify(min(resolution)/2)
+        DS.rio.clip(shapefile.geometry.apply(mapping), shapefile.crs, drop=True)
+
 
     # EXPORT DATASET
 
-    print('Export dataset\n')
+    tqdm.write('Export dataset\n')
 
     start = min([products[uuid]['beginposition'] for uuid in products.keys()])
     end = max([products[uuid]['endposition'] for uuid in products.keys()])
@@ -211,9 +225,10 @@ def main(product, aoi, date, qa, unit, resolution, command, shp):
                         f'{product[4:]}{start.day}-{start.month}-{start.year}'
                         f'__{end.day}-{end.month}-{end.year}.nc')
 
+    DS.compute()
     DS.to_netcdf(file_export_name)
 
-    print('Done\n')
+    tqdm.write('Done\n')
 
 
 if __name__ == "__main__":
@@ -229,7 +244,8 @@ if __name__ == "__main__":
     # CLI ARGUMENTS
 
     parser = argparse.ArgumentParser(
-        description='Request, download and process Sentinel data from Copernicus access hub'
+        description=('Request, download and process Sentinel data from Copernicus access hub. '
+                     'Create a processed netCDF file binned by time, latitude and longitude')
     )
 
     # Product type: Used to perform a product based search
@@ -256,31 +272,43 @@ if __name__ == "__main__":
     #   NOW-<n>HOUR(S)
     #   NOW-<n>DAY(S)
     #   NOW-<n>MONTH(S)
-    parser.add_argument('--date', help='Date', nargs=2,
-                        type=str, default=('NOW-24HOURS', 'NOW'))
+    parser.add_argument('--date', help='date used to perform a time interval search',
+                        nargs=2, type=str, default=('NOW-24HOURS', 'NOW'))
 
-    # Area of interest: The url of the area of interest (.geojson file)
+    # Area of interest: The url of the area of interest (.geojson)
     parser.add_argument(
-        '--aoi', help='The url of the area of interest (.geojson file)', type=str)
+        '--aoi', help='path to the area of interest (.geojson)', type=str)
 
     # Shapefile: The url of the shapefile (.shp) for pixel filtering
     parser.add_argument(
-        '--shp', help='The url of the shapefile (.shp) for masking', type=str)
+        '--shp', help='path to the shapefile (.shp) for masking', type=str)
 
     # Harp command: Harp convert command used during import of products
     parser.add_argument(
-        '--command', help='Harp convert command used during import of products', type=str)
+        '--command', help='harp convert command used during import of products', type=str)
 
     # Unit: Unit conversion
-    parser.add_argument('--unit', help='Unit conversion', type=str)
+    parser.add_argument('--unit', help='unit conversion', type=str)
 
     # qa value: Quality value threshold
-    parser.add_argument('--qa', help='Quality value threshold',
+    parser.add_argument('--qa', help='quality value threshold',
                         type=int, default=75)
 
     # resolution: Spatial resolution in arc degrees
-    parser.add_argument('--resolution', help='Spatial resolution in arc degrees', nargs=2,
+    parser.add_argument('--resolution', help='spatial resolution in arc degrees', nargs=2,
                         type=float, default=(0.01, 0.01))
+
+    # chunk-size:
+    parser.add_argument('--chunk-size', help='dask chunk size along the time dimension',
+                        type=int, default=200)
+
+    # num-threads:
+    parser.add_argument('--num-threads', help='number of threads spawned for L2 download',
+                        type=int, default=4)
+
+    # num-workers:
+    parser.add_argument('--num-workers', help='number of workers spawned for L3 conversion',
+                        type=int, default=cpu_count())
 
     args = parser.parse_args()
 
@@ -308,4 +336,7 @@ if __name__ == "__main__":
          unit=args.unit,
          resolution=args.resolution,
          command=args.command,
-         shp=args.shp)
+         shp=args.shp,
+         chunk_size=args.chunk_size,
+         num_threads=args.num_threads,
+         num_workers=args.num_workers)

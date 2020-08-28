@@ -1,42 +1,16 @@
 from os import makedirs
 from os.path import exists
 
-import xarray as xr
+import itertools
 import harp
-from json import load
 import numpy as np
-from datetime import datetime, timedelta
-from itertools import product
-import cartopy.io.shapereader as shpreader
-import shapely.vectorized
-from shapely.ops import cascaded_union
+import geopandas
+from tqdm import tqdm
+import pandas as pd
 from pathos.multiprocessing import ProcessingPool as Pool, cpu_count
 
 
-def _geojson_coordinates(geojsonurl):
-    """
-    Compute the coordinates of points a geojson file
-
-    :param geojsonurl: (str) Geojson url
-    :return: (list) List of coordinates
-    """
-
-    # load geojson file
-    data = load(open(geojsonurl))
-
-    # create the list of coordinates
-    if data['features'][0]['geometry']['type'] == "MultiPolygon":
-        list_coordinates = np.array(
-            [component[0] for component in data['features'][0]['geometry']['coordinates']])
-
-    else:
-        list_coordinates = np.array(
-            data['features'][0]['geometry']['coordinates'])
-
-    return list_coordinates
-
-
-def geojson_window(geojsonurl):
+def bounding_box(geojsonurl):
     """
     Compute the extent of a geojson file
 
@@ -44,23 +18,15 @@ def geojson_window(geojsonurl):
     :return: (list) Extent
     """
 
-    # create the list of coordinates
-    list_coordinates = _geojson_coordinates(geojsonurl)
-
-    # compute map window
-    min_coordinates_lons = list_coordinates[0][:, 0].min()
-    min_coordinates_lats = list_coordinates[0][:, 1].min()
-
-    max_coordinates_lons = list_coordinates[0][:, 0].max()
-    max_coordinates_lats = list_coordinates[0][:, 1].max()
-
-    extent = [min_coordinates_lons, max_coordinates_lons,
-              min_coordinates_lats, max_coordinates_lats]
-
-    return extent
+    minx, miny, maxx, maxy = geopandas.read_file(geojsonurl).bounds.values.squeeze()
+    return [minx, maxx, miny, maxy]
 
 
-def convert_to_l3_products(filenames, pre_commands='', post_commands='', export_path='L3_data'):
+def convert_to_l3_products(filenames,
+                           pre_commands='',
+                           post_commands='',
+                           export_path='L3_data',
+                           num_workers=cpu_count()):
     """
     Process L2 products and convert to L3 using harpconvert
 
@@ -75,7 +41,7 @@ def convert_to_l3_products(filenames, pre_commands='', post_commands='', export_
         if not exists("{export_path}/{name}".format(export_path=export_path,
                                                     name=filename.split('/')[-1].replace('L2', 'L3'))):
 
-            print(f"Converting {filename}")
+            tqdm.write(f"Converting {filename}")
             if exists(filename):
                 try:
                     output_product = harp.import_product(filename,
@@ -86,46 +52,23 @@ def convert_to_l3_products(filenames, pre_commands='', post_commands='', export_
                                         export_url,
                                         file_format='netcdf',
                                         operations=post_commands)
+                    tqdm.write(f"{filename} successfully converted")
 
                 except harp._harppy.NoDataError:
-                    print((f"Exception occured in {filename}: "
-                           "Product contains no variables or variables without data"))
+                    tqdm.write((f"Exception occured in {filename}: "
+                                "Product contains no variables or variables without data"))
             else:
-                print(f'File {filename} not found')
+                tqdm.write(f'File {filename} not found')
         else:
-            print("File {export_path}/{name} already exists".format(export_path=export_path,
-                                                                    name=filename.split('/')[-1].replace('L2', 'L3')))
+            tqdm.write("File {export_path}/{name} already exists".format(export_path=export_path,
+                                                                         name=filename.split('/')[-1].replace('L2', 'L3')))
 
         return None
 
-    num_workers = min(cpu_count(), len(filenames))
     makedirs(export_path, exist_ok=True)
-    print(f"Launched {num_workers} processes")
+    tqdm.write(f"Launched {num_workers} processes")
     with Pool(processes=num_workers) as pool:
         pool.uimap(_process_file, filenames)
         pool.close()
         pool.join()
-
-
-def make_country_mask(shapefile_url, lons, lats):
-    """
-    Create a mask filtering pixels outside a given shapefile
-
-    :param shapefile_url: (str) Url to shapefile
-    :param lons: (DataArray) Xarray of longitudes
-    :param lats: (DataArray) Xarray of latitudes
-    :return: (array) Numpy mask
-    """
-
-    points = list(product(lats.values, lons.values))
-    x = [i for j, i in points]
-    y = [j for j, i in points]
-
-    reader = shpreader.Reader(shapefile_url)
-    records = list(reader.records())
-
-    # Create mask by fusioning all geometries Polygons in shapefile
-    global_geometry = cascaded_union([area.geometry for area in records])
-    mask = shapely.vectorized.contains(global_geometry, x, y)
-
-    return mask.reshape((lats.shape[0], lons.shape[0]))
+    tqdm.write("\n")

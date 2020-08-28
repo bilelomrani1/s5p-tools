@@ -2,7 +2,7 @@
 Set of tools to query Copernicus database.
 """
 
-from os import listdir, rename, makedirs
+from os import rename, makedirs
 from os.path import exists
 from multiprocessing.pool import ThreadPool
 from tqdm import tqdm
@@ -38,10 +38,10 @@ def query_copernicus_hub(aoi=None,
         products = api.query(footprint, **kwargs)
 
     # display results
-    print(('Number of products found: {number_product}\n'
-           'Total products size: {size:.2f} MB\n'
+    tqdm.write(('Number of products found: {number_product}\n'
+           'Total products size: {size:.2f} GB\n'
            ).format(number_product=len(products),
-                    size=sum([float(products[uuid]['size'][:-3]) for uuid in products.keys()])))
+                    size=api.get_products_size(products)))
 
     return api, products
 
@@ -72,7 +72,7 @@ def request_copernicus_hub(aoi=None,
                            download_directory='L2_data',
                            checksum=True,
                            fix_extension=True,
-                           num_workers=4,
+                           num_threads=4,
                            **kwargs):
     """
     Query Copernicus Open access Hub and download automatically files that are not already downloaded.
@@ -84,7 +84,7 @@ def request_copernicus_hub(aoi=None,
     :param download_directory: (str) Url of folder for downloaded products
     :param checksum: (bool) Verify product integrity after download
     :param fix_extension: (bool) Fix extension from .zip to .nc (see https://github.com/sentinelsat/sentinelsat/issues/270)
-    :param num_workers: (int) Number of parallel threads
+    :param num_threads: (int) Number of parallel threads
     :param kwargs: (dict) extra keywords for the api.query function (see https://sentinelsat.readthedocs.io/en/stable/cli.html#sentinelsat)
     :return: (SentinelAPI, dict) API object and results of query
     """
@@ -93,18 +93,20 @@ def request_copernicus_hub(aoi=None,
     ids_request = list(products.keys())
     makedirs(download_directory, exist_ok=True)
 
+    # Set of free tqdm bar slot
+    free_bars = list(range(num_threads))
+
     def _fetch_product(file_id):
-        id, file_id = file_id
         api = SentinelAPI(login, password, hub)
-        api._tqdm = lambda **kwargs: tqdm(**kwargs, position=id, leave=True)
+        bar_position = free_bars.pop(0)
+        api._tqdm = lambda **kwargs: tqdm(**kwargs, position=bar_position, leave=False)
         if not exists(f"{download_directory}/{products[file_id]['title']}.nc"):
             # file not already downloaded
-            print(
-                f"File {file_id} not found. Downloading into {download_directory}")
+            tqdm.write(f"File {file_id} not found. Downloading into {download_directory}")
             try:
                 api.get_product_odata(file_id)
             except SentinelAPIError:
-                print(f"Error: File {file_id} not found in Hub. Skipping")
+                tqdm.write(f"Error: File {file_id} not found in Hub. Skipping")
             else:
                 while True:
                     try:
@@ -112,25 +114,29 @@ def request_copernicus_hub(aoi=None,
                                      directory_path=download_directory,
                                      checksum=checksum)
                     except InvalidChecksumError:
-                        print("Invalid Checksum Error. Trying again...")
+                        tqdm.write(f"Invalid checksum error in {file_id}. Trying again...")
                         continue
                     else:
                         # fix .zip extention
                         if fix_extension:
                             rename(f"{download_directory}/{products[file_id]['title']}.zip",
                                    f"{download_directory}/{products[file_id]['title']}.nc")
+                        tqdm.write(f"File {file_id} successfully downloaded")
                         break
+                        
 
         else:
-            print(f"File {file_id} already exists")
+            tqdm.write(f"File {file_id} already exists", nolock=True)
 
+        # Free the bar slot
+        free_bars.append(bar_position)
         return None
 
-    print(f"Launched {num_workers} threads")
-    with ThreadPool(num_workers) as pool:
-        pool.imap_unordered(_fetch_product, enumerate(ids_request))
+    tqdm.write(f"Launched {num_threads} threads")
+    with ThreadPool(num_threads) as pool:
+        pool.imap_unordered(_fetch_product, ids_request)
         pool.close()
         pool.join()
 
-    print("\n")
+    tqdm.write("\n")
     return api, products

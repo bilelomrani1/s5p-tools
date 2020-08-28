@@ -7,13 +7,20 @@ A Python script to download and preprocess data from [Copernicus Open Access Hub
 
 ## Installation
 
-The dependencies can be installed with the following commands.
-
-```bash
-conda config --add channels stcorp
-conda install -c stcorp -c conda-forge cartopy dask harp
-pip install -r requirements.txt
+We recommend using `conda` to create and manage a virtual environment when using this set of scripts. You can create a new virtual environment with all dependencies pre-installed using
 ```
+conda create --override-channels -c conda-forge -c stcorp --file requirements.txt --name <envname>
+# sentinelsat is not available through conda so we install it using pip
+conda activate <envname>
+pip install sentinelsat
+```
+Alternatively, to install all dependencies in an already-existing environment, use
+```
+conda install --override-channels -c conda-forge -c stcorp --file requirements.txt
+pip install sentinelsat
+```
+
+> **Notes:** `conda` can take a while to resolve dependencies.
 
 ## Downloading and processing data
 
@@ -26,33 +33,46 @@ python s5p-request.py <product-type>
 ```
 where `<product-type>` is a Sentinel-5P product. TROPOMI Level 2 geophysical products are given in the table below.
 
-| Product type          | Parameter                                                         |
-|-----------------------|-------------------------------------------------------------------|
-| L2__O3____            | Ozone (O3) total column                                           |
-| L2__NO2___            | Nitrogen Dioxide (NO2), tropospheric, stratospheric, slant column |
-| L2__SO2___            | Sulfur Dioxide (SO2) total column                                 |
-| L2__CO____            | Carbon Monoxide (CO) total column                                 |
-| L2__CH4___            | Methane (CH4) total column                                        |
-| L2__HCHO__            | Formaldehyde (HCHO) tropospheric, slant column                    |
-| L2__AER_AI            | UV Aerosol Index                                                  |
-| L2__CLOUD_            | Cloud fraction, albedo, top pressure                              |
+| Product type | Parameter                                                         |
+| ------------ | ----------------------------------------------------------------- |
+| L2__O3____   | Ozone (O3) total column                                           |
+| L2__NO2___   | Nitrogen Dioxide (NO2), tropospheric, stratospheric, slant column |
+| L2__SO2___   | Sulfur Dioxide (SO2) total column                                 |
+| L2__CO____   | Carbon Monoxide (CO) total column                                 |
+| L2__CH4___   | Methane (CH4) total column                                        |
+| L2__HCHO__   | Formaldehyde (HCHO) tropospheric, slant column                    |
+| L2__AER_AI   | UV Aerosol Index                                                  |
+| L2__CLOUD_   | Cloud fraction, albedo, top pressure                              |
 
-By default, the script downloads all products corresponding to the specified product type for the last 24 hours. Custom date query can be specified via the option `--date`.
+By default, the script downloads all products corresponding to the specified product type for the last 24 hours. Custom date query can be specified with `--date`.
 
-The resulting file is a `netCDF` file in the `processed` folder, binned by time, latitude, longitude, aligned on the same regular grid with resolution 0.01 x 0.01 arc degree. For parsing and plotting, we recommend the Python package `xarray`. An example of preliminary analysis can be found in the repo [s5p-analysis](https://github.com/bilelomrani1/s5p-analysis).
+The resulting file is a `netCDF` file in the `processed` folder, binned by time, latitude, longitude, aligned on the same regular grid with resolution 0.01 x 0.01 arc degree by default. For parsing and plotting, we recommend the Python package `xarray`. An example of preliminary analysis can be found in the repo [s5p-analysis](https://github.com/bilelomrani1/s5p-analysis).
 
 ### Options
 
 The script `python s5p-request.py` supports the following optional arguments:
 
+
+| Product type    | Description                                   | Example                                                           |
+| --------------- | --------------------------------------------- | ----------------------------------------------------------------- |
+| `--date`        | Date used to perform a time interval search   | `python s5p-request.py L2__NO2___ --date 20200101 20200108`       |
+| `--aoi`         | Path to the area of interest file (.geojson)  | `python s5p-request.py L2__NO2___ --aoi area_of_interest.geojson` |
+| `--shp`         | Path to the shapefile for masking (.shp)      | `python s5p-request.py L2__NO2___ --shp shapefile.shp`            |
+| `--unit`        | Unit conversion                               | `python s5p-request.py L2__NO2___ --unit Pmolec/cm2`              |
+| `--qa`          | Quality assurance value threshold             | `python s5p-request.py L2__NO2___ --qa 50`                        |
+| `--resolution`  | L3 grid spatial resolution in arc degrees     | `python s5p-request.py L2__NO2___ --resolution 0.1 0.1`           |
+| `--num-threads` | Number of threads spawned for L2 download     | `python s5p-request.py L2__NO2___ --num-threads 2`                |
+| `--num-workers` | Number of processes spawned for L3 conversion | `python s5p-request.py L2__NO2___ --num-workers 8`                |
+
+
 #### Date
 
-The option `--date` allows to specify a custom time range:
+The `--date` option allows to perform a time interval search.
 
 ```bash
 python s5p-request.py <product-type> --date <timestamp> <timestamp>
 ```
-where `<timestamp>` can be expressed in one of the following formats:
+`<timestamp>` can be expressed in one of the following formats:
   - yyyyMMdd
   - yyyy-MM-ddThh:mm:ssZ
   - yyyy-MM-ddThh:mm:ss.SSSZ(ISO8601 format)
@@ -62,9 +82,11 @@ where `<timestamp>` can be expressed in one of the following formats:
   - NOW-<n>DAY(S)
   - NOW-<n>MONTH(S)
 
+The first timestamp is included and the second is excluded.
+
 #### Area of interest
 
-The option `--aoi` allows to specify a custom geographical area with a `geojson` file.
+The `--aoi` option allows to specify a custom geographical area with a `geojson` file.
 
 ```bash
 python s5p-request.py <product-type> --aoi <geojson-file-url>
@@ -73,21 +95,16 @@ You can use [geoJSON.io](http://geojson.io) to generate a custom `.geojson` file
 
 #### Shapefile
 
-The option `--shp` allows to mask the resulting dataset based on the geometry contained in a `.shp` shapefile.
+The `--shp` option allows to mask the resulting dataset based on the geometry contained in a `.shp` shapefile.
 
 ```bash
 python s5p-request.py <product-type> --shp <shapefile-file-url>
 ```
-
-If the shapefile contains more than one geometry, the script considers the union of all geometries. The script expects a shapefile encoded in `utf-8` and projected with Longitude / Latitude WGS84 projection. To standardize your `.shp` file, use the following `ogr2ogr` command from GDAL:
-
-```bash
-ogr2ogr -f "ESRI Shapefile" -lco ENCODING=UTF-8 -t_srs EPSG:4326 output.shp input.shp
-```
+If the shapefile contains more than one geometry, the script considers the union of all geometries.
 
 #### Unit conversion
 
-By default, no unit conversion is performed (SI units). To specify a custom unit conversion, use the option `--unit`.
+By default, no unit conversion is performed (SI units). To perform unit conversion, use `--unit`.
 
 ```bash
 python s5p-request.py <product-type> --unit <unit>
@@ -100,7 +117,7 @@ Unit conversion supports the following arguments for densities:
 
 #### Quality value filtering
 
-By default, the script filters all values whose quality value is below 75. This behavior can be adjusted with the option `--qa`.
+By default, the script filters all values whose quality value is below 75. This behavior can be adjusted with `--qa`.
 
 ```bash
 python s5p-request.py <product-type> --qa <int>
@@ -108,10 +125,26 @@ python s5p-request.py <product-type> --qa <int>
 
 #### Spatial resolution
 
-By default, the script uses a 0.01x0.01 arc degrees resolution grid during the L3 conversion. This resolution can be adjusted with the option `--resolution`. For example, to rather use a 0.1x0.1 arc degrees grid use
+By default, the script uses a 0.01x0.01 arc degrees resolution grid during the L3 conversion. This resolution can be adjusted with `--resolution`.
 
 ```bash
-python s5p-request.py <product-type> --resolution 0.1 0.1
+python s5p-request.py <product-type> --resolution <float> <float>
+```
+
+#### Number of threads
+
+By default, the script spawns 4 threads when downloading from SentinelHub. This number can be adjusted with `--num-threads`.
+
+```
+python s5p-request.py <product-type> --num-threads <int>
+```
+
+#### Number of workers
+
+By default, the script spawns a number of processes equals to the number of virtual cores the when performing L3 conversion. This number can be adjusted with `--num-workers`.
+
+```
+python s5p-request.py <product-type> --num-workers <int>
 ```
 
 ## Acknowledgements
