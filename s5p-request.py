@@ -211,7 +211,7 @@ def main(product, aoi, date, qa, unit, resolution, command, shp, chunk_size, num
         tqdm.write("Applying shapefile\n")
         shapefile = geopandas.read_file(shp).to_crs("EPSG:4326")
         shapefile.geometry = shapefile.geometry.simplify(min(resolution)/2)
-        DS.rio.clip(shapefile.geometry.apply(mapping), shapefile.crs, drop=True)
+        DS = DS.rio.clip(shapefile.geometry.apply(mapping), shapefile.crs, drop=False)
 
 
     # EXPORT DATASET
@@ -225,7 +225,6 @@ def main(product, aoi, date, qa, unit, resolution, command, shp, chunk_size, num
                         f'{product[4:]}{start.day}-{start.month}-{start.year}'
                         f'__{end.day}-{end.month}-{end.year}.nc')
 
-    DS.compute()
     DS.to_netcdf(file_export_name)
 
     tqdm.write('Done\n')
