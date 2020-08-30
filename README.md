@@ -5,6 +5,23 @@ S5P-Tools
 
 A Python script to download and preprocess data from [Copernicus Open Access Hub](https://scihub.copernicus.eu). This implementation is based on `sentinelsat` [package](https://github.com/sentinelsat/sentinelsat) and the [API Hub Access](https://scihub.copernicus.eu/twiki/do/view/SciHubWebPortal/APIHubDescription) to query the database. The preprocessing is made with [HARP tools](https://cdn.rawgit.com/stcorp/harp/master/doc/html/harpconvert.html).
 
+## Contents
+- [S5P-Tools](#s5p-tools)
+  - [Contents](#contents)
+  - [Installation](#installation)
+  - [Downloading and processing data](#downloading-and-processing-data)
+    - [Quick start](#quick-start)
+    - [Options](#options)
+      - [Date](#date)
+      - [Area of interest](#area-of-interest)
+      - [Masking with a shapefile](#masking-with-a-shapefile)
+      - [Unit conversion](#unit-conversion)
+      - [Quality value filtering](#quality-value-filtering)
+      - [Spatial resolution](#spatial-resolution)
+      - [Number of threads](#number-of-threads)
+      - [Number of workers](#number-of-workers)
+  - [Acknowledgements](#acknowledgements)
+
 ## Installation
 
 We recommend using `conda` to create and manage a virtual environment when using this set of scripts. You can create a new virtual environment with all dependencies pre-installed using
@@ -93,7 +110,7 @@ python s5p-request.py <product-type> --aoi <geojson-file-url>
 ```
 You can use [geoJSON.io](http://geojson.io) to generate a custom `.geojson` file for your area of interest.
 
-#### Shapefile
+#### Masking with a shapefile
 
 The `--shp` option allows to mask the resulting dataset based on the geometry contained in a `.shp` shapefile.
 
