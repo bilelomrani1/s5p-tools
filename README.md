@@ -53,7 +53,7 @@ The resulting file is a `netCDF` file in the `processed` folder, binned by time,
 The script `python s5p-request.py` supports the following optional arguments:
 
 
-| Product type    | Description                                   | Example                                                           |
+| Option          | Description                                   | Example                                                           |
 | --------------- | --------------------------------------------- | ----------------------------------------------------------------- |
 | `--date`        | Date used to perform a time interval search   | `python s5p-request.py L2__NO2___ --date 20200101 20200108`       |
 | `--aoi`         | Path to the area of interest file (.geojson)  | `python s5p-request.py L2__NO2___ --aoi area_of_interest.geojson` |
@@ -141,7 +141,7 @@ python s5p-request.py <product-type> --num-threads <int>
 
 #### Number of workers
 
-By default, the script spawns a number of processes equals to the number of virtual cores the when performing L3 conversion. This number can be adjusted with `--num-workers`.
+By default, the script spawns a number of processes equals to the number of virtual cores when performing L3 conversion. This number can be adjusted with `--num-workers`.
 
 ```
 python s5p-request.py <product-type> --num-workers <int>
