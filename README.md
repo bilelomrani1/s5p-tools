@@ -125,7 +125,7 @@ python s5p-request.py <product-type> --qa <int>
 
 #### Spatial resolution
 
-By default, the script uses a 0.01x0.01 arc degrees resolution grid during the L3 conversion. This resolution can be adjusted with `--resolution`.
+By default, the script uses a 0.01x0.01 arc degrees resolution grid during the L3 conversion (this corresponds to a resolution of approximately 1100x1100m, see [Approximate Metric Equivalents for Degrees, Minutes, and Seconds](https://www.usna.edu/Users/oceano/pguth/md_help/html/approx_equivalents.htm)). This resolution can be adjusted with `--resolution`.
 
 ```bash
 python s5p-request.py <product-type> --resolution <float> <float>
