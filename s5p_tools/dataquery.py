@@ -126,7 +126,7 @@ def request_copernicus_hub(aoi=None,
                         
 
         else:
-            tqdm.write(f"File {file_id} already exists", nolock=True)
+            tqdm.write(f"File {file_id} already exists")
 
         # Free the bar slot
         free_bars.append(bar_position)
@@ -134,7 +134,7 @@ def request_copernicus_hub(aoi=None,
 
     tqdm.write(f"Launched {num_threads} threads")
     with ThreadPool(num_threads) as pool:
-        pool.imap_unordered(_fetch_product, ids_request)
+        pool.map_async(_fetch_product, ids_request)
         pool.close()
         pool.join()
 

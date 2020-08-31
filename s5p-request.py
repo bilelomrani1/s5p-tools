@@ -44,95 +44,76 @@ def main(product, aoi, date, qa, unit, resolution, command, shp, chunk_size, num
     # harpconvert commands :
     # the source data is filtered + binning data by latitude/longitude
 
-    harp_filter_commands = {
+    keep_general = ['latitude', 'longitude', 'cloud_fraction', 'sensor_altitude',
+                    'sensor_azimuth_angle', 'sensor_zenith_angle', 'solar_azimuth_angle', 'solar_zenith_angle']
 
-        'L2__NO2___': (f'tropospheric_NO2_column_number_density_validity>={qa};'
-                       'tropospheric_NO2_column_number_density>=0;'
-                       'NO2_column_number_density>=0;'
-                       'stratospheric_NO2_column_number_density>=0;'
-                       'NO2_slant_column_number_density>=0'),
+    harp_dict = {
+        'L2__O3____': {
+            'keep': ['O3_column_number_density', 'O3_effective_temperature'],
+            'filter': [f'O3_column_number_density_validity>={qa}'],
+            'convert': [f'derive(O3_column_number_density [{unit}])']
+        },
 
-        'L2__O3____': (f'O3_column_number_density_validity>={qa};'
-                       'O3_column_number_density>=0'),
+        'L2__NO2___': {
+            'keep': ['tropospheric_NO2_column_number_density', 'NO2_column_number_density',
+                     'stratospheric_NO2_column_number_density', 'NO2_slant_column_number_density',
+                     'tropopause_pressure', 'absorbing_aerosol_index'],
+            'filter': [f'tropospheric_NO2_column_number_density_validity>={qa}',
+                       f'tropospheric_NO2_column_number_density>=0'],
+            'convert': [f'derive(tropospheric_NO2_column_number_density [{unit}])',
+                        f'derive(stratospheric_NO2_column_number_density [{unit}])',
+                        f'derive(NO2_column_number_density [{unit}])',
+                        f'derive(NO2_slant_column_number_density [{unit}])']
+        },
 
-        'L2__SO2___': (f'SO2_column_number_density_validity>={qa};'
-                       'SO2_column_number_density>=0;'
-                       'SO2_slant_column_number_density>=0;'
-                       'O3_column_number_density>=0'),
+        'L2__SO2___': {
+            'keep': ['SO2_column_number_density', 'SO2_column_number_density_amf',
+                     'SO2_slant_column_number_density', 'absorbing_aerosol_index'],
+            'filter': [f'SO2_column_number_density_validity>={qa}'],
+            'convert': [f'derive(SO2_column_number_density [{unit}])',
+                        f'derive(SO2_slant_column_number_density [{unit}])',
+                        f'derive(SO2_column_number_density_amf [{unit}])']
+        },
 
-        'L2__HCHO__': (f'tropospheric_HCHO_column_number_density_validity>={qa};'
-                       'tropospheric_HCHO_column_number_density>=0;'
-                       'HCHO_slant_column_number_density>=0'),
+        'L2__CO____': {
+            'keep': ['CO_column_number_density', 'H2O_column_number_density'],
+            'filter': [f'CO_column_number_density_validity>={qa}'],
+            'convert': [f'derive(CO_column_number_density [{unit}])', f'derive(H2O_column_number_density [{unit}])']
+        },
 
-        'L2__CO____': (f'CO_column_number_density_validity>={qa};'
-                       'H2O_column_number_density>=0'),
+        'L2__CH4___': {
+            'keep': ['CH4_column_volume_mixing_ratio_dry_air', 'aerosol_height, aerosol_optical_depth'],
+            'filter': [f'CH4_column_volume_mixing_ratio_dry_air_validity>={qa}'],
+            'convert': []
+        },
 
-        'L2__CH4___': (f'CH4_column_volume_mixing_ratio_dry_air_validity>={qa};'
-                       'H2O_column_number_density>=0'),
+        'L2__HCHO__': {
+            'keep': ['tropospheric_HCHO_column_number_density', 'tropospheric_HCHO_column_number_density_amf',
+                     'HCHO_slant_column_number_density'],
+            'filter': [f'tropospheric_HCHO_column_number_density_validity>={qa}'],
+            'convert': [f'derive(tropospheric_HCHO_column_number_density [{unit}])',
+                        f'derive(tropospheric_HCHO_column_number_density_amf [{unit}])',
+                        f'derive(HCHO_slant_column_number_density [{unit}])']
+        },
 
-        'L2__AER_AI': (f'absorbing_aerosol_index_validity>={qa}'),
+        'L2__CLOUD_': {
+            'keep': ['cloud_fraction', 'cloud_top_pressure', 'cloud_top_height', 'cloud_base_pressure',
+                     'cloud_base_height', 'cloud_optical_depth', 'surface_albedo'],
+            'filter': [f'cloud_fraction_validity>={qa}'],
+            'convert': []
+        },
 
-        'L2__CLOUD_': (f'cloud_fraction_validity>={qa};'
-                       'cloud_fraction>=0')
+        'L2__AER_AI': {
+            'keep': ['absorbing_aerosol_index'],
+            'filter': [f'absorbing_aerosol_index_validity>={qa}'],
+            'convert': []
+        },
 
-    }
-
-    harp_keep_commands = {
-
-        'L2__NO2___': ('keep(NO2_column_number_density,tropospheric_NO2_column_number_density,'
-                       'stratospheric_NO2_column_number_density,NO2_slant_column_number_density,'
-                       'tropopause_pressure,absorbing_aerosol_index,cloud_fraction,datetime_start,'
-                       'longitude,latitude)'),
-
-        'L2__O3____': ('keep(O3_column_number_density,O3_column_number_density_amf,O3_slant_column_number_density,'
-                       'O3_effective_temperature,cloud_fraction,datetime_start,longitude,latitude)'),
-
-        'L2__SO2___': ('keep(SO2_column_number_density,SO2_column_number_density_amf,SO2_slant_column_number_density,'
-                       'absorbing_aerosol_index,cloud_fraction,datetime_start,longitude,latitude)'),
-
-        'L2__HCHO__': ('keep(tropospheric_HCHO_column_number_density,tropospheric_HCHO_column_number_density_amf,'
-                       'HCHO_slant_column_number_density,cloud_fraction,datetime_start,longitude,latitude)'),
-
-        'L2__CO____': ('keep(CO_column_number_density,H2O_column_number_density,cloud_height,datetime_start,'
-                       'longitude,latitude)'),
-
-        'L2__CH4___': ('keep(CH4_column_volume_mixing_ratio_dry_air, aerosol_height,'
-                       'aerosol_optical_depth,datetime_start,longitude,latitude)'),
-
-        'L2__AER_AI': 'keep(absorbing_aerosol_index,datetime_start,longitude,latitude)',
-
-        'L2__CLOUD_': ('keep(cloud_fraction,cloud_top_pressure,cloud_top_height,cloud_base_pressure,'
-                       'cloud_base_height,cloud_optical_depth,surface_albedo,datetime_start,'
-                       'longitude,latitude)'),
-
-    }
-
-    harp_conversion_commands = {
-
-        'L2__NO2___': (f'derive(tropospheric_NO2_column_number_density [{unit}]);'
-                       f'derive(stratospheric_NO2_column_number_density [{unit}]);'
-                       f'derive(NO2_column_number_density [{unit}]);'
-                       f'derive(NO2_slant_column_number_density [{unit}])'),
-
-        'L2__O3____': (f'derive(O3_column_number_density [{unit}])'),
-
-        'L2__SO2___': (f'derive(SO2_column_number_density [{unit}]);'
-                       f'derive(SO2_slant_column_number_density [{unit}]);'
-                       f'derive(O3_column_number_density [{unit}])'),
-
-        'L2__HCHO__': (f'derive(tropospheric_HCHO_column_number_density [{unit}]);'
-                       f'derive(HCHO_slant_column_number_density [{unit}])'),
-
-        'L2__CO____': (f'derive(CO_column_number_density [{unit}]);'
-                       f'derive(H2O_column_number_density [{unit}])'),
-
-        'L2__CH4___': (f'derive(H2O_column_number_density [{unit}]);'
-                       f'derive(dry_air_column_number_density [{unit}])'),
-
-        'L2__AER_AI': '',
-
-        'L2__CLOUD_': ''
-
+        'L2__AER_LH': {
+            'keep': [],
+            'filter': [],
+            'convert': []
+        }
     }
 
     # Step size for spatial re-gridding (in degrees)
@@ -151,18 +132,12 @@ def main(product, aoi, date, qa, unit, resolution, command, shp, chunk_size, num
 
     # create HARP commands
     if command is None:
-        pre_commands = ''
-
-        if unit is None:
-            pre_commands = f'{harp_filter_commands[product]}'
-        else:
-            pre_commands = f'{harp_filter_commands[product]};{harp_conversion_commands[product]}'
-
-        harp_commands = (f'{pre_commands};derive(datetime_stop {{time}});'
-                         f'bin_spatial({lat_edge_length},{lat_edge_offset},{lat_step},'
-                         f'{lon_edge_length},{lon_edge_offset},{lon_step});'
-                         f'derive(latitude {{latitude}});derive(longitude {{longitude}});'
-                         f'{harp_keep_commands[product]}')
+        harp_commands = ';'.join(harp_dict[product]['filter']) + ';' + \
+                        ';'.join(harp_dict[product]['convert']) + ';' + \
+                        'derive(datetime_stop {time});' + \
+                        f"bin_spatial({lat_edge_length},{lat_edge_offset},{lat_step},{lon_edge_length},{lon_edge_offset},{lon_step});" + \
+                        "derive(latitude {latitude});derive(longitude {longitude});" + \
+                        f"keep({','.join(harp_dict[product]['keep'] + keep_general)})"
 
     else:
         harp_commands = command
@@ -203,7 +178,6 @@ def main(product, aoi, date, qa, unit, resolution, command, shp, chunk_size, num
     DS = DS.sortby('time')
     DS.rio.write_crs("epsg:4326", inplace=True)
     DS.rio.set_spatial_dims(x_dim='longitude', y_dim='latitude', inplace=True)
-    DS = DS.drop_vars('datetime_start')
 
     # APPLY SHAPEFILE
 
@@ -211,8 +185,8 @@ def main(product, aoi, date, qa, unit, resolution, command, shp, chunk_size, num
         tqdm.write("Applying shapefile\n")
         shapefile = geopandas.read_file(shp).to_crs("EPSG:4326")
         shapefile.geometry = shapefile.geometry.simplify(min(resolution)/2)
-        DS = DS.rio.clip(shapefile.geometry.apply(mapping), shapefile.crs, drop=False)
-
+        DS = DS.rio.clip(shapefile.geometry.apply(
+            mapping), shapefile.crs, drop=False)
 
     # EXPORT DATASET
 
@@ -287,7 +261,8 @@ if __name__ == "__main__":
         '--command', help='harp convert command used during import of products', type=str)
 
     # Unit: Unit conversion
-    parser.add_argument('--unit', help='unit conversion', type=str)
+    parser.add_argument('--unit', help='unit conversion',
+                        type=str, default='mol/m2')
 
     # qa value: Quality value threshold
     parser.add_argument('--qa', help='quality value threshold',
