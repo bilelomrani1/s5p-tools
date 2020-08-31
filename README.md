@@ -14,12 +14,17 @@ A Python script to download and preprocess data from [Copernicus Open Access Hub
     - [Options](#options)
       - [Date](#date)
       - [Area of interest](#area-of-interest)
-      - [Masking with a shapefile](#masking-with-a-shapefile)
       - [Unit conversion](#unit-conversion)
       - [Quality value filtering](#quality-value-filtering)
       - [Spatial resolution](#spatial-resolution)
       - [Number of threads](#number-of-threads)
       - [Number of workers](#number-of-workers)
+  - [Compressing the data](#compressing-the-data)
+    - [Quick start](#quick-start-1)
+    - [Options](#options-1)
+      - [Resampling the time dimension](#resampling-the-time-dimension)
+      - [Masking with a shapefile](#masking-with-a-shapefile)
+      - [Number of workers](#number-of-workers-1)
   - [Acknowledgements](#acknowledgements)
 
 ## Installation
@@ -70,16 +75,15 @@ The resulting file is a `netCDF` file in the `processed` folder, binned by time,
 The script `python s5p-request.py` supports the following optional arguments:
 
 
-| Option          | Description                                   | Example                                                           |
-| --------------- | --------------------------------------------- | ----------------------------------------------------------------- |
-| `--date`        | Date used to perform a time interval search   | `python s5p-request.py L2__NO2___ --date 20200101 20200108`       |
-| `--aoi`         | Path to the area of interest file (.geojson)  | `python s5p-request.py L2__NO2___ --aoi area_of_interest.geojson` |
-| `--shp`         | Path to the shapefile for masking (.shp)      | `python s5p-request.py L2__NO2___ --shp shapefile.shp`            |
-| `--unit`        | Unit conversion                               | `python s5p-request.py L2__NO2___ --unit Pmolec/cm2`              |
-| `--qa`          | Quality assurance value threshold             | `python s5p-request.py L2__NO2___ --qa 50`                        |
-| `--resolution`  | L3 grid spatial resolution in arc degrees     | `python s5p-request.py L2__NO2___ --resolution 0.1 0.1`           |
-| `--num-threads` | Number of threads spawned for L2 download     | `python s5p-request.py L2__NO2___ --num-threads 2`                |
-| `--num-workers` | Number of processes spawned for L3 conversion | `python s5p-request.py L2__NO2___ --num-workers 8`                |
+| Option          | Description                                   |
+| --------------- | --------------------------------------------- |
+| `--date`        | Date used to perform a time interval search   |
+| `--aoi`         | Path to the area of interest file (.geojson)  |
+| `--unit`        | Unit conversion                               |
+| `--qa`          | Quality assurance value threshold             |
+| `--resolution`  | L3 grid spatial resolution in arc degrees     |
+| `--num-threads` | Number of threads spawned for L2 download     |
+| `--num-workers` | Number of processes spawned for L3 conversion |
 
 
 #### Date
@@ -109,15 +113,6 @@ The `--aoi` option allows to specify a custom geographical area with a `geojson`
 python s5p-request.py <product-type> --aoi <geojson-file-url>
 ```
 You can use [geoJSON.io](http://geojson.io) to generate a custom `.geojson` file for your area of interest.
-
-#### Masking with a shapefile
-
-The `--shp` option allows to mask the resulting dataset based on the geometry contained in a `.shp` shapefile.
-
-```bash
-python s5p-request.py <product-type> --shp <shapefile-file-url>
-```
-If the shapefile contains more than one geometry, the script considers the union of all geometries.
 
 #### Unit conversion
 
@@ -162,6 +157,53 @@ By default, the script spawns a number of processes equals to the number of virt
 
 ```
 python s5p-request.py <product-type> --num-workers <int>
+```
+
+## Compressing the data
+
+### Quick start
+
+The script `s5p-compress.py` is used to compress a processed netCDF file into multiple compressed `tif` files. The syntax is the following:
+
+```bash
+python s5p-compress.py <netcdf-file> <band-name>
+```
+where `<netcdf-file>` is a processed netCDF file created by `s5p-request.py` and `band-name` is the name of the variable to export.
+
+### Options
+
+| Option              | Description                                   |
+| ------------------- | --------------------------------------------- |
+| `--time-resolution` | Resampling rate of the time dimension         |
+| `--shp`             | Path to the shapefile for masking (.shp)      |
+| `--num-workers`     | Number of processes spawned for L3 conversion |
+
+#### Resampling the time dimension
+
+By default, the sampling rate of the time dimension is set to `1D` so that the scripts export one file per day. Use the option `--time-resolution <n><frequency>` to adjust this behavior. The available date frequencies can be found below:
+
+| Frequency String | Description |
+| ---------------- | ----------- |
+| `W`              | Week        |
+| `M`              | Month       |
+| `A`              | Year        |
+| `D`              | Day         |
+
+#### Masking with a shapefile
+
+The `--shp` option allows to mask the resulting compressed files with the geometry contained in a `.shp` shapefile.
+
+```bash
+python s5p-compress.py <netcdf-file> <band-name> --shp <shapefile-file-url>
+```
+If the shapefile contains more than one geometry, the script considers the union of all geometries.
+
+#### Number of workers
+
+By default, the script spawns a number of processes equals to the number of virtual cores when compressing the raster files. This number can be adjusted with `--num-workers`.
+
+```
+python s5p-compress.py <netcdf-file> <band-name> --num-workers <int>
 ```
 
 ## Acknowledgements

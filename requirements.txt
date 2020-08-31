@@ -4,7 +4,6 @@ harp>=1.11
 netcdf4>=1.5
 numpy>=1.19
 pandas>=1.1
-pathos>=0.2
 python>=3.7
 rioxarray>=0.0.31
 shapely>=1.6
