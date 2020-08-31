@@ -4,20 +4,18 @@ from os import makedirs
 import warnings
 
 from tqdm import tqdm
-from pathos.multiprocessing import cpu_count
+from multiprocessing import cpu_count
 import xarray as xr
 import rioxarray
-import geopandas
-from shapely.geometry import mapping
 import numpy as np
 import pandas as pd
 
 from s5p_tools import bounding_box, convert_to_l3_products, request_copernicus_hub, get_filenames_request
 
 
-def main(product, aoi, date, qa, unit, resolution, command, shp, chunk_size, num_threads, num_workers):
+def main(product, aoi, date, qa, unit, resolution, command, chunk_size, num_threads, num_workers):
 
-    tqdm.write('\nRequest products\n')
+    tqdm.write('\nRequesting products\n')
 
     _, products = request_copernicus_hub(login=DHUS_USER,
                                          password=DHUS_PASSWORD,
@@ -39,7 +37,7 @@ def main(product, aoi, date, qa, unit, resolution, command, shp, chunk_size, num
 
     # PREPROCESS DATA
 
-    tqdm.write('Convert into L3 products\n')
+    tqdm.write('Converting into L3 products\n')
 
     # harpconvert commands :
     # the source data is filtered + binning data by latitude/longitude
@@ -158,7 +156,7 @@ def main(product, aoi, date, qa, unit, resolution, command, shp, chunk_size, num
 
     # AGGREGATE DATASET
 
-    tqdm.write('Process data\n')
+    tqdm.write('Processing data\n')
 
     # Avoid lost attributes during conversion
     xr.set_options(keep_attrs=True)
@@ -172,6 +170,7 @@ def main(product, aoi, date, qa, unit, resolution, command, shp, chunk_size, num
                             if exists(filename.replace('L2', 'L3'))],
                            combine='nested',
                            concat_dim='time',
+                           parallel=True,
                            preprocess=preprocess,
                            decode_times=False,
                            chunks={'time': chunk_size})
@@ -179,18 +178,9 @@ def main(product, aoi, date, qa, unit, resolution, command, shp, chunk_size, num
     DS.rio.write_crs("epsg:4326", inplace=True)
     DS.rio.set_spatial_dims(x_dim='longitude', y_dim='latitude', inplace=True)
 
-    # APPLY SHAPEFILE
-
-    if shp is not None:
-        tqdm.write("Applying shapefile\n")
-        shapefile = geopandas.read_file(shp).to_crs("EPSG:4326")
-        shapefile.geometry = shapefile.geometry.simplify(min(resolution)/2)
-        DS = DS.rio.clip(shapefile.geometry.apply(
-            mapping), shapefile.crs, drop=False)
-
     # EXPORT DATASET
 
-    tqdm.write('Export dataset\n')
+    tqdm.write('Exporting netCDF file\n')
 
     start = min([products[uuid]['beginposition'] for uuid in products.keys()])
     end = max([products[uuid]['endposition'] for uuid in products.keys()])
@@ -252,10 +242,6 @@ if __name__ == "__main__":
     parser.add_argument(
         '--aoi', help='path to the area of interest (.geojson)', type=str)
 
-    # Shapefile: The url of the shapefile (.shp) for pixel filtering
-    parser.add_argument(
-        '--shp', help='path to the shapefile (.shp) for masking', type=str)
-
     # Harp command: Harp convert command used during import of products
     parser.add_argument(
         '--command', help='harp convert command used during import of products', type=str)
@@ -310,7 +296,6 @@ if __name__ == "__main__":
          unit=args.unit,
          resolution=args.resolution,
          command=args.command,
-         shp=args.shp,
          chunk_size=args.chunk_size,
          num_threads=args.num_threads,
          num_workers=args.num_workers)
