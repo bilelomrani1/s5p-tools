@@ -252,7 +252,7 @@ if __name__ == "__main__":
 
     # qa value: Quality value threshold
     parser.add_argument('--qa', help='quality value threshold',
-                        type=int, default=75)
+                        type=int, default=50)
 
     # resolution: Spatial resolution in arc degrees
     parser.add_argument('--resolution', help='spatial resolution in arc degrees', nargs=2,
