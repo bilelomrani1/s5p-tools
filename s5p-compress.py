@@ -3,6 +3,7 @@ from os import makedirs
 from os.path import exists
 import warnings
 
+import pandas as pd
 import numpy as np
 from functools import partial
 import geopandas
@@ -13,16 +14,9 @@ import rioxarray
 from multiprocessing import Pool, cpu_count
 
 
-def _export_raster(index, band_name, time_resolution, shapefile, ds, export_dir):
+def _export_raster(index, band_name, time_resolution, date_ranges, shapefile, ds, export_dir):
 
-    frequency = time_resolution[-1]
-    date_format_mapping = {'D': '%Y-%m-%d',
-                           'W': '%Y-%m-week_%W',
-                           'M': '%Y-%m',
-                           'A': '%Y'}
-    date_format = date_format_mapping[frequency]
-    date = ds.isel(time=index).time.dt.strftime(date_format).values.item(0)
-    export_name = (f"{export_dir}/{date}.tif")
+    export_name = (f"{export_dir}/{date_ranges[index]}.tif")
 
     if shapefile is not None:
         ds.isel(time=index).rio.clip(shapefile.geometry.apply(
@@ -103,12 +97,24 @@ def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers, 
     makedirs(export_path, exist_ok=True)
     num_time = len(ds.time)
 
+    # Create date ranges
+    frequency = time_resolution[-1]
+    date_format_mapping = {'D': '%Y-%m-%d',
+                           'W': '%Y-%m-week_%W',
+                           'M': '%Y-%m',
+                           'A': '%Y'}
+    date_format = date_format_mapping[frequency]
+    idx = pd.to_datetime(ds.time.values).to_period(time_resolution)
+    date_ranges = ['{0}__{1}'.format(s, e) for s, e in zip(idx.asfreq(frequency, 's').strftime(date_format),
+                                                           idx.asfreq(frequency, 'e').strftime(date_format))]
+
     with Pool(processes=num_workers) as pool:
         list(tqdm(pool.imap_unordered(partial(_export_raster,
                                               band_name=band_name,
                                               time_resolution=time_resolution,
                                               shapefile=shapefile,
                                               ds=ds,
+                                              date_ranges=date_ranges,
                                               export_dir=export_path),
                                       range(num_time)), desc="Exporting", total=num_time))
         pool.close()
