@@ -8,6 +8,7 @@ from functools import partial
 import geopandas
 from shapely.geometry import mapping
 from tqdm import tqdm
+import xarray as xr
 import rioxarray
 from multiprocessing import Pool, cpu_count
 
@@ -39,7 +40,7 @@ def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers, 
         tqdm.write(f"The file {netcdf_file} does not exist")
         exit(1)
     else:
-        DS = rioxarray.open_rasterio(netcdf_file, chunks={'time': chunk_size})
+        DS = xr.open_dataset(netcdf_file, chunks={'time': chunk_size})
 
     # Check if the band name is correct
     while True:
@@ -119,6 +120,7 @@ if __name__ == "__main__":
 
     # Ignore warnings
     warnings.filterwarnings("ignore", category=RuntimeWarning)
+    warnings.filterwarnings("ignore", category=FutureWarning)
 
     # CLI ARGUMENTS
 
