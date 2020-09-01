@@ -71,7 +71,7 @@ def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers, 
 
     while True:
         try:
-            ds = ds.reduce(eval(f'np.nan{agg_func}'))
+            ds = ds.reduce(eval(f'np.nan{agg_func}')).compute()
             break
         except AttributeError:
             tqdm.write("The aggregation function string must "
