@@ -35,6 +35,8 @@ def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers, 
         exit(1)
     else:
         DS = xr.open_dataset(netcdf_file, chunks={'time': chunk_size})
+        DS.rio.write_crs("epsg:4326", inplace=True)
+        DS.rio.set_spatial_dims(x_dim='longitude', y_dim='latitude', inplace=True)
 
     # Check if the band name is correct
     while True:
@@ -84,8 +86,9 @@ def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers, 
         tqdm.write("Loading and simplifying shapefile...\n")
 
         # Compute the spatial resolution of the data
-        delta_x, delta_y = abs(ds.x[1] - ds.x[0]), abs(ds.y[1] - ds.y[0])
-        resolution = min(delta_x, delta_y).values.item(0) / 2
+        delta_x = abs(ds.longitude.item(0) - ds.longitude.item(1))
+        delta_y = abs(ds.latitude.item(0) - ds.latitude.item(1))
+        resolution = min(delta_x, delta_y) / 2
 
         # Load, reproject and simplify the geometries
         shapefile = geopandas.read_file(shp).to_crs("EPSG:4326")
