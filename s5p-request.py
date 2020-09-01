@@ -1,16 +1,18 @@
 import argparse
-from os.path import exists
-from os import makedirs
+import sys
 import warnings
-
-from tqdm import tqdm
 from multiprocessing import cpu_count
-import xarray as xr
-import rioxarray
+from os import makedirs
+from os.path import exists
+
 import numpy as np
 import pandas as pd
+import rioxarray
+import xarray as xr
+from tqdm import tqdm
 
-from s5p_tools import bounding_box, convert_to_l3_products, request_copernicus_hub, get_filenames_request
+from s5p_tools import (bounding_box, convert_to_l3_products,
+                       get_filenames_request, request_copernicus_hub)
 
 
 def main(product, aoi, date, qa, unit, resolution, command, chunk_size, num_threads, num_workers):
@@ -33,7 +35,7 @@ def main(product, aoi, date, qa, unit, resolution, command, chunk_size, num_thre
 
     if len(L2_files_urls) == 0:
         tqdm.write('Done\n')
-        exit(0)
+        sys.exit(0)
 
     # PREPROCESS DATA
 
@@ -57,7 +59,7 @@ def main(product, aoi, date, qa, unit, resolution, command, chunk_size, num_thre
                      'stratospheric_NO2_column_number_density', 'NO2_slant_column_number_density',
                      'tropopause_pressure', 'absorbing_aerosol_index'],
             'filter': [f'tropospheric_NO2_column_number_density_validity>={qa}',
-                       f'tropospheric_NO2_column_number_density>=0'],
+                       'tropospheric_NO2_column_number_density>=0'],
             'convert': [f'derive(tropospheric_NO2_column_number_density [{unit}])',
                         f'derive(stratospheric_NO2_column_number_density [{unit}])',
                         f'derive(NO2_column_number_density [{unit}])',
@@ -143,6 +145,7 @@ def main(product, aoi, date, qa, unit, resolution, command, chunk_size, num_thre
     # perform conversion
     convert_to_l3_products(L2_files_urls,
                            pre_commands=harp_commands,
+                           post_commands='',
                            export_path=f"{EXPORT_DIR}/{product.replace('L2', 'L3')}",
                            num_workers=num_workers)
 
@@ -182,8 +185,8 @@ def main(product, aoi, date, qa, unit, resolution, command, chunk_size, num_thre
 
     tqdm.write('Exporting netCDF file\n')
 
-    start = min([products[uuid]['beginposition'] for uuid in products.keys()])
-    end = max([products[uuid]['endposition'] for uuid in products.keys()])
+    start = min(products[uuid]['beginposition'] for uuid in products.keys())
+    end = max(products[uuid]['endposition'] for uuid in products.keys())
     makedirs(f'{PROCESSED_DIR}/processed{product[2:]}', exist_ok=True)
     file_export_name = (f'{PROCESSED_DIR}/processed{product[2:]}/'
                         f'{product[4:]}{start.day}-{start.month}-{start.year}'
@@ -198,6 +201,7 @@ if __name__ == "__main__":
 
     # Ignore warnings
     warnings.filterwarnings("ignore", category=RuntimeWarning)
+    warnings.filterwarnings("ignore", category=FutureWarning)
 
     # PARAMS
 

@@ -1,17 +1,15 @@
 import argparse
+import sys
+import warnings
 from os import makedirs
 from os.path import exists
-import warnings
 
-import pandas as pd
-import numpy as np
-from functools import partial
 import geopandas
+import numpy as np
+import pandas as pd
+import rioxarray
 from shapely.geometry import mapping
 from tqdm import tqdm, trange
-import xarray as xr
-import rioxarray
-from multiprocessing import Pool, cpu_count
 
 
 def _export_raster(index, date_ranges, shapefile, ds, export_dir):
@@ -25,14 +23,14 @@ def _export_raster(index, date_ranges, shapefile, ds, export_dir):
         ds.isel(time=index).rio.to_raster(export_name)
 
 
-def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers, agg_func, export_dir):
+def main(netcdf_file, time_resolution, shp, band_name, chunk_size, agg_func, export_dir):
 
     tqdm.write("\n")
 
     # Check if netcdf_file exists
     if not exists(netcdf_file):
         tqdm.write(f"The file {netcdf_file} does not exist")
-        exit(1)
+        sys.exit(1)
     else:
         DS = rioxarray.open_rasterio(netcdf_file, chunks={'time': chunk_size})
 
@@ -139,15 +137,9 @@ if __name__ == "__main__":
     parser.add_argument(
         '--shp', help='path to the shapefile (.shp) for masking', type=str)
 
-    # chunk-size:
     parser.add_argument('--chunk-size', help='dask chunk size along the time dimension',
                         type=int, default=200)
 
-    # num-workers:
-    parser.add_argument('--num-workers', help='number of workers spawned for compression',
-                        type=int, default=cpu_count())
-
-    # num-workers:
     parser.add_argument('--agg-func', help='aggregation function',
                         type=str, default='mean')
 
@@ -163,6 +155,5 @@ if __name__ == "__main__":
          shp=args.shp,
          band_name=args.band,
          chunk_size=args.chunk_size,
-         num_workers=args.num_workers,
          agg_func=args.agg_func,
          export_dir=EXPORT_DIR)

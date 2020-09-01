@@ -25,7 +25,6 @@ A Python script to download and preprocess data from [Copernicus Open Access Hub
       - [Resampling the time dimension](#resampling-the-time-dimension)
       - [Masking with a shapefile](#masking-with-a-shapefile)
       - [Aggregation function after resampling](#aggregation-function-after-resampling)
-      - [Number of workers](#number-of-workers-1)
   - [Acknowledgements](#acknowledgements)
 
 ## Installation
@@ -211,13 +210,6 @@ By default, the script uses `--agg-func mean` which corresponds to taking the me
 - `max`
 - `min`
 
-#### Number of workers
-
-By default, the script spawns a number of processes equals to the number of virtual cores when compressing the raster files. This number can be adjusted with `--num-workers`.
-
-```
-python s5p-compress.py <netcdf-file> <band-name> --num-workers <int>
-```
 
 ## Acknowledgements
 
