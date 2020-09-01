@@ -8,13 +8,13 @@ import numpy as np
 from functools import partial
 import geopandas
 from shapely.geometry import mapping
-from tqdm import tqdm
+from tqdm import tqdm, trange
 import xarray as xr
 import rioxarray
 from multiprocessing import Pool, cpu_count
 
 
-def _export_raster(index, band_name, time_resolution, date_ranges, shapefile, ds, export_dir):
+def _export_raster(index, date_ranges, shapefile, ds, export_dir):
 
     export_name = (f"{export_dir}/{date_ranges[index]}.tif")
 
@@ -34,9 +34,7 @@ def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers, 
         tqdm.write(f"The file {netcdf_file} does not exist")
         exit(1)
     else:
-        DS = xr.open_dataset(netcdf_file, chunks={'time': chunk_size})
-        DS.rio.write_crs("epsg:4326", inplace=True)
-        DS.rio.set_spatial_dims(x_dim='longitude', y_dim='latitude', inplace=True)
+        DS = rioxarray.open_rasterio(netcdf_file, chunks={'time': chunk_size})
 
     # Check if the band name is correct
     while True:
@@ -86,8 +84,8 @@ def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers, 
         tqdm.write("Loading and simplifying shapefile...\n")
 
         # Compute the spatial resolution of the data
-        delta_x = abs(ds.longitude.item(0) - ds.longitude.item(1))
-        delta_y = abs(ds.latitude.item(0) - ds.latitude.item(1))
+        delta_x = abs(ds.x.item(0) - ds.x.item(1))
+        delta_y = abs(ds.y.item(0) - ds.y.item(1))
         resolution = min(delta_x, delta_y) / 2
 
         # Load, reproject and simplify the geometries
@@ -107,21 +105,18 @@ def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers, 
                            'M': '%Y-%m',
                            'A': '%Y'}
     date_format = date_format_mapping[frequency]
-    idx = pd.to_datetime(ds.time.values).to_period(time_resolution)
+    idx = pd.to_datetime(
+        list(map(lambda x: x.isoformat(), ds.time.values))).to_period(time_resolution)
     date_ranges = ['{0}__{1}'.format(s, e) for s, e in zip(idx.asfreq(frequency, 's').strftime(date_format),
                                                            idx.asfreq(frequency, 'e').strftime(date_format))]
 
-    with Pool(processes=num_workers) as pool:
-        list(tqdm(pool.imap_unordered(partial(_export_raster,
-                                              band_name=band_name,
-                                              time_resolution=time_resolution,
-                                              shapefile=shapefile,
-                                              ds=ds,
-                                              date_ranges=date_ranges,
-                                              export_dir=export_path),
-                                      range(num_time)), desc="Exporting", total=num_time))
-        pool.close()
-        pool.join()
+    for i in trange(num_time, desc="Exporting"):
+        _export_raster(index=i,
+                       shapefile=shapefile,
+                       ds=ds,
+                       date_ranges=date_ranges,
+                       export_dir=export_path)
+
     tqdm.write('\nDone\n')
 
 
