@@ -11,8 +11,17 @@ import rioxarray
 from multiprocessing import Pool, cpu_count
 
 
-def _export_raster(index, band_name, time_resolution, shapefile, ds):
-    export_name = f"{EXPORT_DIR}/{band_name}/{time_resolution}__{ds.time.values[index].strftime('%Y-%m-%d')}.tif"
+def _export_raster(index, band_name, time_resolution, shapefile, ds, export_dir):
+
+    frequency = time_resolution[-1]
+    date_format_mapping = {'D': '%Y-%m-%d',
+                           'W': '%Y-%m-week_%W',
+                           'M': '%Y-%m',
+                           'A': '%Y'}
+    date_format = date_format_mapping[frequency]
+    date = ds.isel(time=index).time.dt.strftime(date_format).values.item(0)
+    export_name = (f"{export_dir}/{band_name}/{date}.tif")
+
     if shapefile is not None:
         ds.isel(time=index).rio.clip(shapefile.geometry.apply(
             mapping), shapefile.crs).rio.to_raster(export_name)
@@ -20,26 +29,47 @@ def _export_raster(index, band_name, time_resolution, shapefile, ds):
         ds.isel(time=index).rio.to_raster(export_name)
 
 
-def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers):
+def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers, export_dir):
 
     tqdm.write("\n")
+
+    # Check if netcdf_file exists
     if not exists(netcdf_file):
         tqdm.write(f"The file {netcdf_file} does not exist")
         exit(1)
     else:
         DS = rioxarray.open_rasterio(netcdf_file, chunks={'time': chunk_size})
 
+    # Check if the band name is correct
     while True:
         try:
             band = DS[band_name]
             break
         except KeyError:
-            tqdm.write("The band name does not exist. The following bands were found:")
+            tqdm.write(("The band name does not exist."
+                        "The following bands were found:"))
             for variable in DS.data_vars.keys():
                 tqdm.write(f'\t{variable}')
             band_name = input("Band name: ")
 
-    ds = band.resample(time=time_resolution).mean(dim='time', skipna=None)
+    # Check if the time resolution is correct
+    frequency_mapping = {'D': "day",
+                         'W': "week",
+                         'M': "month",
+                         'A': "year"}
+
+    while True:
+        try:
+            ds = band.resample(time=time_resolution).mean(
+                dim='time', skipna=None)
+            break
+        except ValueError:
+            tqdm.write(("The frequency string must be of the form: "
+                        "<n><freq> with <n> an integer and <freq> one "
+                        "of the following:"))
+            for freq_code, freq_name in frequency_mapping.items():
+                tqdm.write(f"{freq_code}: {freq_name}")
+            time_resolution = input("Enter a valid frequency string: ")
 
     if shp is not None:
         tqdm.write("Loading and simplifying shapefile...\n")
@@ -54,7 +84,7 @@ def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers):
     else:
         shapefile = None
 
-    makedirs(f'{EXPORT_DIR}/{band_name}', exist_ok=True)
+    makedirs(f'{export_dir}/{band_name}', exist_ok=True)
     num_time = len(ds.time)
 
     with Pool(processes=num_workers) as pool:
@@ -62,7 +92,8 @@ def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers):
                                               band_name=band_name,
                                               time_resolution=time_resolution,
                                               shapefile=shapefile,
-                                              ds=ds),
+                                              ds=ds,
+                                              export_dir=export_dir),
                                       range(num_time)), desc="Exporting", total=num_time))
         pool.close()
         pool.join()
@@ -112,4 +143,5 @@ if __name__ == "__main__":
          shp=args.shp,
          band_name=args.band,
          chunk_size=args.chunk_size,
-         num_workers=args.num_workers)
+         num_workers=args.num_workers,
+         export_dir=EXPORT_DIR)
