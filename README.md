@@ -24,6 +24,7 @@ A Python script to download and preprocess data from [Copernicus Open Access Hub
     - [Options](#options-1)
       - [Resampling the time dimension](#resampling-the-time-dimension)
       - [Masking with a shapefile](#masking-with-a-shapefile)
+      - [Aggregation function after resampling](#aggregation-function-after-resampling)
       - [Number of workers](#number-of-workers-1)
   - [Acknowledgements](#acknowledgements)
 
@@ -176,6 +177,7 @@ where `<netcdf-file>` is a processed netCDF file created by `s5p-request.py` and
 | ------------------- | --------------------------------------------- |
 | `--time-resolution` | Resampling rate of the time dimension         |
 | `--shp`             | Path to the shapefile for masking (.shp)      |
+| `--agg-func`        | Aggregation function after resampling         |
 | `--num-workers`     | Number of processes spawned for L3 conversion |
 
 #### Resampling the time dimension
@@ -197,6 +199,17 @@ The `--shp` option allows to mask the resulting compressed files with the geomet
 python s5p-compress.py <netcdf-file> <band-name> --shp <shapefile-file-url>
 ```
 If the shapefile contains more than one geometry, the script considers the union of all geometries.
+
+#### Aggregation function after resampling
+
+By default, the script uses `--agg-func mean` which corresponds to taking the mean after the resampling operation. The following aggregation functions can be used in place of `--agg-func mean`.
+
+- `mean`
+- `median`
+- `sum`
+- `std`
+- `max`
+- `min`
 
 #### Number of workers
 

@@ -3,6 +3,7 @@ from os import makedirs
 from os.path import exists
 import warnings
 
+import numpy as np
 from functools import partial
 import geopandas
 from shapely.geometry import mapping
@@ -20,7 +21,7 @@ def _export_raster(index, band_name, time_resolution, shapefile, ds, export_dir)
                            'A': '%Y'}
     date_format = date_format_mapping[frequency]
     date = ds.isel(time=index).time.dt.strftime(date_format).values.item(0)
-    export_name = (f"{export_dir}/{band_name}/{date}.tif")
+    export_name = (f"{export_dir}/{date}.tif")
 
     if shapefile is not None:
         ds.isel(time=index).rio.clip(shapefile.geometry.apply(
@@ -29,7 +30,7 @@ def _export_raster(index, band_name, time_resolution, shapefile, ds, export_dir)
         ds.isel(time=index).rio.to_raster(export_name)
 
 
-def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers, export_dir):
+def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers, agg_func, export_dir):
 
     tqdm.write("\n")
 
@@ -60,8 +61,7 @@ def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers, 
 
     while True:
         try:
-            ds = band.resample(time=time_resolution).mean(
-                dim='time', skipna=None)
+            ds = band.resample(time=time_resolution)
             break
         except ValueError:
             tqdm.write(("The frequency string must be of the form: "
@@ -70,6 +70,20 @@ def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers, 
             for freq_code, freq_name in frequency_mapping.items():
                 tqdm.write(f"{freq_code}: {freq_name}")
             time_resolution = input("Enter a valid frequency string: ")
+
+    # Check if agg_func is correct
+    aggfunc_mapping = ['mean', 'median', 'sum', 'std', 'min', 'max']
+
+    while True:
+        try:
+            ds = ds.reduce(eval(f'np.nan{agg_func}'))
+            break
+        except AttributeError:
+            tqdm.write("The aggregation function string must "
+                       "be of the following:")
+            for agg_func in aggfunc_mapping:
+                tqdm.write(agg_func)
+            agg_func = input("Enter a valid aggregation function string: ")
 
     if shp is not None:
         tqdm.write("Loading and simplifying shapefile...\n")
@@ -84,7 +98,8 @@ def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers, 
     else:
         shapefile = None
 
-    makedirs(f'{export_dir}/{band_name}', exist_ok=True)
+    export_path = f'{export_dir}/{band_name}/{agg_func}'
+    makedirs(export_path, exist_ok=True)
     num_time = len(ds.time)
 
     with Pool(processes=num_workers) as pool:
@@ -93,7 +108,7 @@ def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers, 
                                               time_resolution=time_resolution,
                                               shapefile=shapefile,
                                               ds=ds,
-                                              export_dir=export_dir),
+                                              export_dir=export_path),
                                       range(num_time)), desc="Exporting", total=num_time))
         pool.close()
         pool.join()
@@ -131,6 +146,10 @@ if __name__ == "__main__":
     parser.add_argument('--num-workers', help='number of workers spawned for compression',
                         type=int, default=cpu_count())
 
+    # num-workers:
+    parser.add_argument('--agg-func', help='aggregation function',
+                        type=str, default='mean')
+
     args = parser.parse_args()
 
     # PATHS
@@ -144,4 +163,5 @@ if __name__ == "__main__":
          band_name=args.band,
          chunk_size=args.chunk_size,
          num_workers=args.num_workers,
+         agg_func=args.agg_func,
          export_dir=EXPORT_DIR)
