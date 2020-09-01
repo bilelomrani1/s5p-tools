@@ -81,16 +81,11 @@ def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers, 
             agg_func = input("Enter a valid aggregation function string: ")
 
     if shp is not None:
-        tqdm.write("Loading and simplifying shapefile...\n")
+        tqdm.write("Loading shapefile...\n")
 
-        # Compute the spatial resolution of the data
-        delta_x = abs(ds.x.item(0) - ds.x.item(1))
-        delta_y = abs(ds.y.item(0) - ds.y.item(1))
-        resolution = min(delta_x, delta_y) / 2
-
-        # Load, reproject and simplify the geometries
+        # Load and reproject the geometries
         shapefile = geopandas.read_file(shp).to_crs("EPSG:4326")
-        shapefile.geometry = shapefile.geometry.simplify(resolution)
+
     else:
         shapefile = None
 
