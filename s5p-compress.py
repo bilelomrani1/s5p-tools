@@ -80,7 +80,7 @@ def main(netcdf_file, time_resolution, shp, band_name, chunk_size, num_workers, 
             break
         except AttributeError:
             tqdm.write("The aggregation function string must "
-                       "be of the following:")
+                       "be one of the following:")
             for agg_func in aggfunc_mapping:
                 tqdm.write(agg_func)
             agg_func = input("Enter a valid aggregation function string: ")
