@@ -173,12 +173,12 @@ where `<netcdf-file>` is a processed netCDF file created by `s5p-request.py` and
 
 ### Options
 
-| Option              | Description                                   |
-| ------------------- | --------------------------------------------- |
-| `--time-resolution` | Resampling rate of the time dimension         |
-| `--shp`             | Path to the shapefile for masking (.shp)      |
-| `--agg-func`        | Aggregation function after resampling         |
-| `--num-workers`     | Number of processes spawned for L3 conversion |
+| Option              | Description                                     |
+| ------------------- | ----------------------------------------------- |
+| `--time-resolution` | Resampling rate of the time dimension           |
+| `--shp`             | Path to the shapefile for masking (.shp)        |
+| `--agg-func`        | Aggregation function after resampling           |
+| `--num-workers`     | Number of processes spawned for tif compression |
 
 #### Resampling the time dimension
 
