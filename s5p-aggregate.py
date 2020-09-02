@@ -1,5 +1,4 @@
 import argparse
-import sys
 import warnings
 from os import makedirs
 from pathlib import Path
@@ -16,9 +15,13 @@ def main(raster_path, shp_path, col_name, agg_func, export_dir):
     if col_name is None:
         col_name = f"{agg_func}_raster"
 
-    shp[col_name] = shp.apply(lambda row: raster.rio.clip(
-        [row.geometry], shp.crs).reduce(eval(f'np.nan{agg_func}')).values.item(0), axis=1)
+    def _agg(row):
+        try:
+            return raster.rio.clip([row.geometry], shp.crs).reduce(eval(f'np.nan{agg_func}')).values.item(0)
+        except rioxarray.exceptions.NoDataInBounds:
+            return np.nan
 
+    shp[col_name] = shp.apply(_agg, axis=1)
     export_path = export_dir / agg_func
     makedirs(export_path, exist_ok=True)
     shp.to_file(f"{export_path}/{raster_path.stem}__{shp_path.stem}.shp")
