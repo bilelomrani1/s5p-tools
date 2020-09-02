@@ -25,6 +25,11 @@ A Python script to download and preprocess data from [Copernicus Open Access Hub
       - [Resampling the time dimension](#resampling-the-time-dimension)
       - [Masking with a shapefile](#masking-with-a-shapefile)
       - [Aggregation function after resampling](#aggregation-function-after-resampling)
+  - [Aggregation](#aggregation)
+    - [Quick start](#quick-start-2)
+    - [Options](#options-2)
+      - [Column name](#column-name)
+      - [Aggregation function](#aggregation-function)
   - [Acknowledgements](#acknowledgements)
 
 ## Installation
@@ -210,6 +215,32 @@ By default, the script uses `--agg-func mean` which corresponds to taking the me
 - `max`
 - `min`
 
+## Aggregation
+
+### Quick start
+
+The script `s5p-aggregate.py` exports a shapefile with a colum n containing aggregated data extracted from an input raster file. The syntax is the following:
+
+```bash
+python s5p-aggregate.py <raster-url> <shapefile-url>
+```
+
+### Options
+
+#### Column name
+
+You can adjust the name given to the column with `--col-name`.
+
+#### Aggregation function
+
+By default, the script uses `--agg-func mean` which corresponds to taking the mean of the raster on each geometry contained in the shapefile. The following aggregation functions can be used in place of `--agg-func mean`.
+
+- `mean`
+- `median`
+- `sum`
+- `std`
+- `max`
+- `min`
 
 ## Acknowledgements
 
