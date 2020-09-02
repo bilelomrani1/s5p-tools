@@ -3,6 +3,7 @@
 from multiprocessing.pool import ThreadPool
 from os import makedirs, rename
 from os.path import exists
+from pathlib import Path
 
 from sentinelsat.sentinel import (InvalidChecksumError, SentinelAPI,
                                   SentinelAPIError, geojson_to_wkt,
@@ -10,11 +11,7 @@ from sentinelsat.sentinel import (InvalidChecksumError, SentinelAPI,
 from tqdm import tqdm
 
 
-def query_copernicus_hub(aoi=None,
-                         username='s5pguest',
-                         password='s5pguest',
-                         hub='https://s5phub.copernicus.eu/dhus',
-                         **kwargs):
+def query_copernicus_hub(aoi, username, password, hub, **kwargs):
     """Query Copernicus Open access Hub.
 
     :param aoi: (str) Geojson Area of interest url
@@ -32,7 +29,7 @@ def query_copernicus_hub(aoi=None,
         products = api.query(**kwargs)
     else:
         # convert .geojson file
-        footprint = geojson_to_wkt(read_geojson(aoi))
+        footprint = geojson_to_wkt(read_geojson(Path(aoi)))
         products = api.query(footprint, **kwargs)
 
     # display results
@@ -44,7 +41,7 @@ def query_copernicus_hub(aoi=None,
     return api, products
 
 
-def get_filenames_request(products, download_directory='L2_data'):
+def get_filenames_request(products, download_directory):
     """Get local files url corresponding to a Copernicus request (must be already downloaded).
 
     :param products: (dict) Copernicus Hub query
@@ -55,21 +52,13 @@ def get_filenames_request(products, download_directory='L2_data'):
     ids_request = list(products.keys())
 
     # list of downloaded filenames urls
-    filenames = [
-        f"{download_directory}/{products[file_id]['title']}.nc" for file_id in ids_request]
+    filenames = [download_directory /
+                 f"{products[file_id]['title']}.nc" for file_id in ids_request]
 
     return filenames
 
 
-def request_copernicus_hub(aoi=None,
-                           login='s5pguest',
-                           password='s5pguest',
-                           hub='https://s5phub.copernicus.eu/dhus',
-                           download_directory='L2_data',
-                           checksum=True,
-                           fix_extension=True,
-                           num_threads=4,
-                           **kwargs):
+def request_copernicus_hub(aoi, login, password, hub, download_directory, checksum, fix_extension=True, num_threads=4, **kwargs):
     """Query Copernicus Open access Hub and download automatically files that are not already downloaded.
 
     :param aoi: (str) Geojson Area of interest url
@@ -96,7 +85,7 @@ def request_copernicus_hub(aoi=None,
         api._tqdm = lambda **kwargs: tqdm(position=bar_position,
                                           leave=False, **kwargs)
 
-        if not exists(f"{download_directory}/{products[file_id]['title']}.nc"):
+        if not exists(download_directory / f"{products[file_id]['title']}.nc"):
             # file not already downloaded
             tqdm.write(
                 f"File {file_id} not found. Downloading into {download_directory}")
@@ -117,8 +106,8 @@ def request_copernicus_hub(aoi=None,
                     else:
                         # fix .zip extention
                         if fix_extension:
-                            rename(f"{download_directory}/{products[file_id]['title']}.zip",
-                                   f"{download_directory}/{products[file_id]['title']}.nc")
+                            rename(download_directory / f"{products[file_id]['title']}.zip",
+                                   download_directory / f"{products[file_id]['title']}.nc")
                         tqdm.write(f"File {file_id} successfully downloaded")
                         break
 

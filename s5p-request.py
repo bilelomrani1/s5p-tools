@@ -4,6 +4,7 @@ import warnings
 from multiprocessing import cpu_count
 from os import makedirs
 from os.path import exists
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -26,12 +27,11 @@ def main(product, aoi, date, qa, unit, resolution, command, chunk_size, num_thre
                                          date=date,
                                          platformname='Sentinel-5 Precursor',
                                          producttype=product,
-                                         download_directory=f'{DOWNLOAD_DIR}/{product}',
+                                         download_directory=DOWNLOAD_DIR / product,
                                          checksum=CHECKSUM,
                                          num_threads=num_threads)
 
-    L2_files_urls = get_filenames_request(
-        products, f'{DOWNLOAD_DIR}/{product}')
+    L2_files_urls = get_filenames_request(products, DOWNLOAD_DIR / product)
 
     if len(L2_files_urls) == 0:
         tqdm.write('Done\n')
@@ -122,7 +122,7 @@ def main(product, aoi, date, qa, unit, resolution, command, chunk_size, num_thre
     if aoi is None:
         extent = [-180, 180, -90, 90]
     else:
-        extent = bounding_box(aoi)
+        extent = bounding_box(Path(aoi))
 
     # computes offsets and number of samples
     lat_edge_length = int(abs(extent[3] - extent[2]) / lat_step + 1)
@@ -146,12 +146,13 @@ def main(product, aoi, date, qa, unit, resolution, command, chunk_size, num_thre
     convert_to_l3_products(L2_files_urls,
                            pre_commands=harp_commands,
                            post_commands='',
-                           export_path=f"{EXPORT_DIR}/{product.replace('L2', 'L3')}",
+                           export_path=EXPORT_DIR /
+                           product.replace('L2', 'L3'),
                            num_workers=num_workers)
 
     # Recover attributes
     attributes = {
-        filename.split('/')[-1]: {
+        filename.name: {
             'time_coverage_start': xr.open_dataset(filename).attrs['time_coverage_start'],
             'time_coverage_end': xr.open_dataset(filename).attrs['time_coverage_end'],
         } for filename in L2_files_urls
@@ -169,8 +170,8 @@ def main(product, aoi, date, qa, unit, resolution, command, chunk_size, num_thre
             np.array([attributes[ds.attrs['source_product']]['time_coverage_start']])).values
         return ds
 
-    DS = xr.open_mfdataset([filename.replace('L2', 'L3') for filename in L2_files_urls
-                            if exists(filename.replace('L2', 'L3'))],
+    DS = xr.open_mfdataset([str(filename.relative_to('.')).replace('L2', 'L3') for filename in L2_files_urls
+                            if exists(str(filename.relative_to('.')).replace('L2', 'L3'))],
                            combine='nested',
                            concat_dim='time',
                            parallel=True,
@@ -187,10 +188,10 @@ def main(product, aoi, date, qa, unit, resolution, command, chunk_size, num_thre
 
     start = min(products[uuid]['beginposition'] for uuid in products.keys())
     end = max(products[uuid]['endposition'] for uuid in products.keys())
-    makedirs(f'{PROCESSED_DIR}/processed{product[2:]}', exist_ok=True)
-    file_export_name = (f'{PROCESSED_DIR}/processed{product[2:]}/'
-                        f'{product[4:]}{start.day}-{start.month}-{start.year}'
-                        f'__{end.day}-{end.month}-{end.year}.nc')
+    export_dir = PROCESSED_DIR / f'processed{product[2:]}'
+    makedirs(export_dir, exist_ok=True)
+    file_export_name = export_dir / (f'{product[4:]}{start.day}-{start.month}-{start.year}__'
+                                     f'{end.day}-{end.month}-{end.year}.nc')
 
     DS.to_netcdf(file_export_name)
 
@@ -279,13 +280,13 @@ if __name__ == "__main__":
     # PATHS
 
     # download_directory: directory for L2 products
-    DOWNLOAD_DIR = 'L2_data'
+    DOWNLOAD_DIR = Path('L2_data')
 
     # export_directory: directory for L3 products
-    EXPORT_DIR = 'L3_data'
+    EXPORT_DIR = Path('L3_data')
 
     # processed_directory: directory for processed products (aggregated+masked)
-    PROCESSED_DIR = 'processed'
+    PROCESSED_DIR = Path('processed')
 
     # CREDENTIALS
 

@@ -5,8 +5,6 @@ from os.path import exists
 
 import geopandas
 import harp
-import numpy as np
-import pandas as pd
 from tqdm import tqdm
 
 
@@ -25,18 +23,17 @@ def _process_file(filename, pre_commands, post_commands, export_path):
 
     # write does not work until https://github.com/tqdm/tqdm/issues/680 is solved
 
-    if not exists("{export_path}/{name}".format(export_path=export_path,
-                                                name=filename.split('/')[-1].replace('L2', 'L3'))):
+    if not exists(export_path / filename.name.replace('L2', 'L3')):
 
         # tqdm.write(f"Converting {filename}")
         if exists(filename):
             try:
-                output_product = harp.import_product(filename,
+                output_product = harp.import_product(str(filename),
                                                      operations=pre_commands)
-                export_url = "{export_path}/{name}".format(export_path=export_path,
-                                                           name=filename.split('/')[-1].replace('L2', 'L3'))
+                export_url = export_path / \
+                    f"{filename.stem.replace('L2', 'L3')}.nc"
                 harp.export_product(output_product,
-                                    export_url,
+                                    str(export_url),
                                     file_format='netcdf',
                                     operations=post_commands)
                 # tqdm.write(f"{filename} successfully converted")
