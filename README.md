@@ -6,31 +6,17 @@ S5P-Tools
 A Python script to download and preprocess data from [Copernicus Open Access Hub](https://scihub.copernicus.eu). This implementation is based on `sentinelsat` [package](https://github.com/sentinelsat/sentinelsat) and the [API Hub Access](https://scihub.copernicus.eu/twiki/do/view/SciHubWebPortal/APIHubDescription) to query the database. The preprocessing is made with [HARP tools](https://cdn.rawgit.com/stcorp/harp/master/doc/html/harpconvert.html).
 
 ## Contents
-- [S5P-Tools](#s5p-tools)
-  - [Contents](#contents)
-  - [Installation](#installation)
-  - [Downloading and processing data](#downloading-and-processing-data)
-    - [Quick start](#quick-start)
-    - [Options](#options)
-      - [Date](#date)
-      - [Area of interest](#area-of-interest)
-      - [Unit conversion](#unit-conversion)
-      - [Quality value filtering](#quality-value-filtering)
-      - [Spatial resolution](#spatial-resolution)
-      - [Number of threads](#number-of-threads)
-      - [Number of workers](#number-of-workers)
-  - [Compressing the data](#compressing-the-data)
-    - [Quick start](#quick-start-1)
-    - [Options](#options-1)
-      - [Resampling the time dimension](#resampling-the-time-dimension)
-      - [Masking with a shapefile](#masking-with-a-shapefile)
-      - [Aggregation function after resampling](#aggregation-function-after-resampling)
-  - [Aggregation](#aggregation)
-    - [Quick start](#quick-start-2)
-    - [Options](#options-2)
-      - [Column name](#column-name)
-      - [Aggregation function](#aggregation-function)
-  - [Acknowledgements](#acknowledgements)
+- [Installation](#installation)
+- [Downloading and processing data](#downloading-and-processing-data)
+  - [Quick start](#quick-start)
+  - [Options](#options)
+- [Compressing the data](#compressing-the-data)
+  - [Quick start](#quick-start-1)
+  - [Options](#options-1)
+- [Aggregation](#aggregation)
+  - [Quick start](#quick-start-2)
+  - [Options](#options-2)
+- [Acknowledgements](#acknowledgements)
 
 ## Installation
 
@@ -259,7 +245,6 @@ issn = "2352-3409",
 doi = "https://doi.org/10.1016/j.dib.2019.105089",
 url = "http://www.sciencedirect.com/science/article/pii/S2352340919314453",
 author = "Hichem Omrani and Bilel Omrani and Benoit Parmentier and Marco Helbich",
-keywords = "Air pollution, Remote sensing, Monitoring",
-abstract = "Monitoring of air pollution is an important task in public health. Availability of data is often hindered by the paucity of the ground monitoring station network. We present here a new spatio-temporal dataset collected and processed from the Sentinel 5P remote sensing platform. As an example application, we applied the full workflow to process measurements of nitrogen dioxide (NO2) collected over the territory of mainland France from May 2018 to June 2019. The data stack generated is daily measurements at a 4 × 7 km spatial resolution. The supplementary Python code package used to collect and process the data is made publicly available. The dataset provided in this article is of value for policy-makers and health assessment."
+keywords = "Air pollution, Remote sensing, Monitoring"
 }
 ```
