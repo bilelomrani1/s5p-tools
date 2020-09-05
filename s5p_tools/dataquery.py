@@ -1,5 +1,7 @@
 """Set of tools to query Copernicus database."""
 
+from functools import partial
+from multiprocessing import Lock, Manager
 from multiprocessing.pool import ThreadPool
 from os import makedirs, rename
 from os.path import exists
@@ -76,12 +78,10 @@ def request_copernicus_hub(aoi, login, password, hub, download_directory, checks
     ids_request = list(products.keys())
     makedirs(download_directory, exist_ok=True)
 
-    # Set of free tqdm bar slot
-    free_bars = list(range(num_threads))
-
-    def _fetch_product(file_id):
+    def _fetch_product(file_id, lock):
         api = SentinelAPI(login, password, hub)
-        bar_position = free_bars.pop(0)
+        with lock:
+            bar_position = free_bars.pop(0)
         api._tqdm = lambda **kwargs: tqdm(position=bar_position,
                                           leave=False, **kwargs)
 
@@ -115,14 +115,20 @@ def request_copernicus_hub(aoi, login, password, hub, download_directory, checks
             tqdm.write(f"File {file_id} already exists")
 
         # Free the bar slot
-        free_bars.append(bar_position)
+        with lock:
+            free_bars.append(bar_position)
+
         return None
 
     tqdm.write(f"Launched {num_threads} threads")
-    with ThreadPool(num_threads) as pool:
-        pool.map_async(_fetch_product, ids_request)
-        pool.close()
-        pool.join()
+    lock = Lock()
+    with Manager() as manager:
+        free_bars = manager.list(list(range(num_threads)))
+        with ThreadPool(num_threads) as pool:
+            pool.imap_unordered(
+                partial(_fetch_product, lock=lock), ids_request)
+            pool.close()
+            pool.join()
 
     tqdm.write("\n")
     return api, products
