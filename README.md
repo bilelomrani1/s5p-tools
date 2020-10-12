@@ -85,14 +85,14 @@ The `--date` option allows to perform a time interval search.
 python s5p-request.py <product-type> --date <timestamp> <timestamp>
 ```
 `<timestamp>` can be expressed in one of the following formats:
-  - yyyyMMdd
-  - yyyy-MM-ddThh:mm:ssZ
-  - yyyy-MM-ddThh:mm:ss.SSSZ(ISO8601 format)
-  - NOW
-  - NOW-<n>MINUTE(S)
-  - NOW-<n>HOUR(S)
-  - NOW-<n>DAY(S)
-  - NOW-<n>MONTH(S)
+  - `yyyyMMdd`
+  - `yyyy-MM-ddThh:mm:ssZ`
+  - `yyyy-MM-ddThh:mm:ss.SSSZ`(ISO8601 format)
+  - `NOW`
+  - `NOW-<n>MINUTE(S)`
+  - `NOW-<n>HOUR(S)`
+  - `NOW-<n>DAY(S)`
+  - `NOW-<n>MONTH(S)`
 
 The first timestamp is included and the second is excluded.
 
