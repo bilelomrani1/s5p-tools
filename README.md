@@ -234,7 +234,7 @@ The authors are grateful to the Luxembourg Institute of Socio-Economic Research 
 
 If you use this code, please consider citing the following paper.
 
-```
+```bibtex
 @article{OMRANI2020105089,
 title = "Spatio-temporal data on the air pollutant nitrogen dioxide derived from Sentinel satellite for France",
 journal = "Data in Brief",
