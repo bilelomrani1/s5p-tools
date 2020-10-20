@@ -17,7 +17,11 @@ def main(raster_path, shp_path, col_name, agg_func, export_dir):
 
     def _agg(row):
         try:
-            return raster.rio.clip([row.geometry], shp.crs).reduce(eval(f'np.nan{agg_func}')).values.item(0)
+            return (
+                raster.rio.clip([row.geometry], shp.crs)
+                .reduce(eval(f"np.nan{agg_func}"))
+                .values.item(0)
+            )
         except rioxarray.exceptions.NoDataInBounds:
             return np.nan
 
@@ -36,31 +40,35 @@ if __name__ == "__main__":
     # CLI ARGUMENTS
 
     parser = argparse.ArgumentParser(
-        description=('Export a shapefile with a column containing aggregated'
-                     'data extracted from an input raster file')
+        description=(
+            "Export a shapefile with a column containing aggregated"
+            "data extracted from an input raster file"
+        )
+    )
+
+    parser.add_argument("raster", help="path to the a raster tif file", type=str)
+
+    parser.add_argument("shp", help="path to the shapefile", type=str)
+
+    parser.add_argument(
+        "--col-name", help="name of the column to be created in the shapefile", type=str
     )
 
     parser.add_argument(
-        'raster', help='path to the a raster tif file', type=str)
-
-    parser.add_argument(
-        'shp', help='path to the shapefile', type=str)
-
-    parser.add_argument(
-        '--col-name', help='name of the column to be created in the shapefile', type=str)
-
-    parser.add_argument('--agg-func', help='aggregation function',
-                        type=str, default='mean')
+        "--agg-func", help="aggregation function", type=str, default="mean"
+    )
 
     args = parser.parse_args()
 
     # PATHS
 
     # export: directory for shapefile
-    EXPORT_DIR = 'aggregated'
+    EXPORT_DIR = "aggregated"
 
-    main(raster_path=Path(args.raster),
-         shp_path=Path(args.shp),
-         col_name=args.col_name,
-         agg_func=args.agg_func,
-         export_dir=Path(EXPORT_DIR))
+    main(
+        raster_path=Path(args.raster),
+        shp_path=Path(args.shp),
+        col_name=args.col_name,
+        agg_func=args.agg_func,
+        export_dir=Path(EXPORT_DIR),
+    )

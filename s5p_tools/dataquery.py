@@ -7,9 +7,13 @@ from os import makedirs, rename
 from os.path import exists
 from pathlib import Path
 
-from sentinelsat.sentinel import (InvalidChecksumError, SentinelAPI,
-                                  SentinelAPIError, geojson_to_wkt,
-                                  read_geojson)
+from sentinelsat.sentinel import (
+    InvalidChecksumError,
+    SentinelAPI,
+    SentinelAPIError,
+    geojson_to_wkt,
+    read_geojson,
+)
 from tqdm import tqdm
 
 
@@ -35,10 +39,12 @@ def query_copernicus_hub(aoi, username, password, hub, **kwargs):
         products = api.query(footprint, **kwargs)
 
     # display results
-    tqdm.write(('Number of products found: {number_product}\n'
-                'Total products size: {size:.2f} GB\n'
-                ).format(number_product=len(products),
-                         size=api.get_products_size(products)))
+    tqdm.write(
+        (
+            "Number of products found: {number_product}\n"
+            "Total products size: {size:.2f} GB\n"
+        ).format(number_product=len(products), size=api.get_products_size(products))
+    )
 
     return api, products
 
@@ -54,13 +60,25 @@ def get_filenames_request(products, download_directory):
     ids_request = list(products.keys())
 
     # list of downloaded filenames urls
-    filenames = [download_directory /
-                 f"{products[file_id]['title']}.nc" for file_id in ids_request]
+    filenames = [
+        download_directory / f"{products[file_id]['title']}.nc"
+        for file_id in ids_request
+    ]
 
     return filenames
 
 
-def request_copernicus_hub(aoi, login, password, hub, download_directory, checksum, fix_extension=True, num_threads=4, **kwargs):
+def request_copernicus_hub(
+    aoi,
+    login,
+    password,
+    hub,
+    download_directory,
+    checksum,
+    fix_extension=True,
+    num_threads=4,
+    **kwargs,
+):
     """Query Copernicus Open access Hub and download automatically files that are not already downloaded.
 
     :param aoi: (str) Geojson Area of interest url
@@ -82,13 +100,13 @@ def request_copernicus_hub(aoi, login, password, hub, download_directory, checks
         api = SentinelAPI(login, password, hub)
         with lock:
             bar_position = free_bars.pop(0)
-        api._tqdm = lambda **kwargs: tqdm(position=bar_position,
-                                          leave=False, **kwargs)
+        api._tqdm = lambda **kwargs: tqdm(position=bar_position, leave=False, **kwargs)
 
         if not exists(download_directory / f"{products[file_id]['title']}.nc"):
             # file not already downloaded
             tqdm.write(
-                f"File {file_id} not found. Downloading into {download_directory}")
+                f"File {file_id} not found. Downloading into {download_directory}"
+            )
             try:
                 api.get_product_odata(file_id)
             except SentinelAPIError:
@@ -96,18 +114,24 @@ def request_copernicus_hub(aoi, login, password, hub, download_directory, checks
             else:
                 while True:
                     try:
-                        api.download(file_id,
-                                     directory_path=download_directory,
-                                     checksum=checksum)
+                        api.download(
+                            file_id,
+                            directory_path=download_directory,
+                            checksum=checksum,
+                        )
                     except InvalidChecksumError:
-                        tqdm.write((f"Invalid checksum error in {file_id}. "
-                                    "Trying again..."))
+                        tqdm.write(
+                            (f"Invalid checksum error in {file_id}. " "Trying again...")
+                        )
                         continue
                     else:
                         # fix .zip extention
                         if fix_extension:
-                            rename(download_directory / f"{products[file_id]['title']}.zip",
-                                   download_directory / f"{products[file_id]['title']}.nc")
+                            rename(
+                                download_directory
+                                / f"{products[file_id]['title']}.zip",
+                                download_directory / f"{products[file_id]['title']}.nc",
+                            )
                         tqdm.write(f"File {file_id} successfully downloaded")
                         break
 
@@ -125,8 +149,7 @@ def request_copernicus_hub(aoi, login, password, hub, download_directory, checks
     with Manager() as manager:
         free_bars = manager.list(list(range(num_threads)))
         with ThreadPool(num_threads) as pool:
-            pool.imap_unordered(
-                partial(_fetch_product, lock=lock), ids_request)
+            pool.imap_unordered(partial(_fetch_product, lock=lock), ids_request)
             pool.close()
             pool.join()
 

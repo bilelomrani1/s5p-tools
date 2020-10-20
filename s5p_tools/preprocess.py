@@ -14,8 +14,7 @@ def bounding_box(geojsonurl):
     :param geojsonurl: (str) Geojson url
     :return: (list) Extent
     """
-    minx, miny, maxx, maxy = geopandas.read_file(
-        geojsonurl).bounds.values.squeeze()
+    minx, miny, maxx, maxy = geopandas.read_file(geojsonurl).bounds.values.squeeze()
     return [minx, maxx, miny, maxy]
 
 
@@ -23,19 +22,21 @@ def _process_file(filename, pre_commands, post_commands, export_path):
 
     # write does not work until https://github.com/tqdm/tqdm/issues/680 is solved
 
-    if not exists(export_path / filename.name.replace('L2', 'L3')):
+    if not exists(export_path / filename.name.replace("L2", "L3")):
 
         # tqdm.write(f"Converting {filename}")
         if exists(filename):
             try:
-                output_product = harp.import_product(str(filename),
-                                                     operations=pre_commands)
-                export_url = export_path / \
-                    f"{filename.stem.replace('L2', 'L3')}.nc"
-                harp.export_product(output_product,
-                                    str(export_url),
-                                    file_format='netcdf',
-                                    operations=post_commands)
+                output_product = harp.import_product(
+                    str(filename), operations=pre_commands
+                )
+                export_url = export_path / f"{filename.stem.replace('L2', 'L3')}.nc"
+                harp.export_product(
+                    output_product,
+                    str(export_url),
+                    file_format="netcdf",
+                    operations=post_commands,
+                )
                 # tqdm.write(f"{filename} successfully converted")
 
             except harp._harppy.NoDataError:
@@ -53,7 +54,9 @@ def _process_file(filename, pre_commands, post_commands, export_path):
     return None
 
 
-def convert_to_l3_products(filenames, pre_commands, post_commands, export_path, num_workers):
+def convert_to_l3_products(
+    filenames, pre_commands, post_commands, export_path, num_workers
+):
     """Process L2 products and convert to L3 using harpconvert.
 
     :param filenames: (list) List of urls of L2 products
@@ -65,12 +68,22 @@ def convert_to_l3_products(filenames, pre_commands, post_commands, export_path, 
     tqdm.write(f"Launched {num_workers} processes")
 
     with Pool(processes=num_workers) as pool:
-        list(tqdm(pool.imap_unordered(partial(_process_file,
-                                              pre_commands=pre_commands,
-                                              post_commands=post_commands,
-                                              export_path=export_path),
-                                      filenames),
-                  desc="Converting", leave=False, total=len(filenames)))
+        list(
+            tqdm(
+                pool.imap_unordered(
+                    partial(
+                        _process_file,
+                        pre_commands=pre_commands,
+                        post_commands=post_commands,
+                        export_path=export_path,
+                    ),
+                    filenames,
+                ),
+                desc="Converting",
+                leave=False,
+                total=len(filenames),
+            )
+        )
         pool.close()
         pool.join()
     tqdm.write("\n")
