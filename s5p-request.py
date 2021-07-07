@@ -101,22 +101,22 @@ def main(
     tqdm.write("Converting into L3 products\n")
 
     # Step size for spatial re-gridding (in degrees)
-    lon_step, lat_step = resolution
+    xstep, ystep = resolution
 
     if aoi is None:
-        extent = [-180, 180, -90, 90]
+        minx, miny, maxx, maxy = -180, -90, 180, 90
     else:
-        extent = geopandas.read_file(Path(aoi)).bounds.values.squeeze()
+        minx, miny, maxx, maxy = geopandas.read_file(Path(aoi)).bounds.values.squeeze()
 
     # computes offsets and number of samples
-    lat_length, lat_offset, lon_length, lon_offset = compute_lengths_and_offsets(extent, lat_step, lon_step)
+    lat_length, lat_offset, lon_length, lon_offset = compute_lengths_and_offsets(minx, miny, maxx, maxy, ystep, xstep)
 
     harp_commands = generate_harp_commands(
         producttype,
         qa,
         unit,
-        lon_step,
-        lat_step,
+        xstep,
+        ystep,
         lat_length,
         lat_offset,
         lon_length,

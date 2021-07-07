@@ -9,12 +9,12 @@ from sentinelsat.sentinel import (
 from tqdm import tqdm
 
 
-def compute_lengths_and_offsets(extent, lat_step, lon_step):
+def compute_lengths_and_offsets(minx, miny, maxx, maxy, ystep, xstep):
 
-    lat_edge_length = int(abs(extent[3] - extent[2]) / lat_step + 1)
-    lat_edge_offset = extent[2]
-    lon_edge_length = int(abs(extent[1] - extent[0]) / lon_step + 1)
-    lon_edge_offset = extent[0]
+    lat_edge_length = int(abs(maxy - miny) / ystep + 1)
+    lat_edge_offset = miny
+    lon_edge_length = int(abs(maxx - minx) / xstep + 1)
+    lon_edge_offset = minx
 
     return lat_edge_length, lat_edge_offset, lon_edge_length, lon_edge_offset
 

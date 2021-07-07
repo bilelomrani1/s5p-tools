@@ -18,7 +18,7 @@ def _export_raster(index, date_ranges, shapefile, ds, export_dir):
 
     if shapefile is not None:
         ds.isel(time=index).rio.clip(
-            shapefile.geometry.apply(mapping), shapefile.crs
+            shapefile.geometry.apply(mapping), "EPSG:4326"
         ).rio.to_raster(export_name)
     else:
         ds.isel(time=index).rio.to_raster(export_name)
