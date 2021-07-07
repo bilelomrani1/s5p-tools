@@ -1,182 +1,104 @@
 import argparse
-import sys
-import warnings
-from multiprocessing import cpu_count
-from os import makedirs
+from functools import partial
+import geopandas
+from multiprocessing.pool import ThreadPool, Pool
+from os import cpu_count, makedirs
 from os.path import exists
 from pathlib import Path
-
-import numpy as np
-import pandas as pd
 import rioxarray
-import xarray as xr
+from sentinelsat.sentinel import (
+    SentinelAPI,
+    geojson_to_wkt,
+    read_geojson,
+)
+import sys
 from tqdm import tqdm
+import xarray as xr
 
 from s5p_tools import (
-    bounding_box,
-    convert_to_l3_products,
-    get_filenames_request,
-    request_copernicus_hub,
+    compute_lengths_and_offsets,
+    fetch_product,
+    generate_harp_commands,
+    preprocess_time,
+    process_file,
+    DHUS_USER,
+    DHUS_PASSWORD,
+    DHUS_URL,
+    DOWNLOAD_DIR,
+    EXPORT_DIR,
+    PROCESSED_DIR
 )
 
 
 def main(
-    product,
+    producttype,
     aoi,
     date,
     qa,
     unit,
     resolution,
-    command,
     chunk_size,
     num_threads,
     num_workers,
 ):
 
+    api = SentinelAPI(DHUS_USER, DHUS_PASSWORD, DHUS_URL)
+
     tqdm.write("\nRequesting products\n")
 
-    _, products = request_copernicus_hub(
-        login=DHUS_USER,
-        password=DHUS_PASSWORD,
-        hub=DHUS_URL,
-        aoi=aoi,
-        date=date,
-        platformname="Sentinel-5 Precursor",
-        producttype=product,
-        download_directory=DOWNLOAD_DIR / product,
-        checksum=CHECKSUM,
-        num_threads=num_threads,
+    query_body = {
+        "date": date,
+        "platformname": "Sentinel-5 Precursor",
+        "producttype": producttype
+    }
+
+    # query database
+    if aoi is None:
+        products = api.query(**query_body)
+    else:
+        footprint = geojson_to_wkt(read_geojson(Path(aoi)))
+        products = api.query(footprint, **query_body)
+
+    # display results
+    tqdm.write(
+        (
+            "Number of products found: {number_product}\n"
+            "Total products size: {size:.2f} GB\n"
+        ).format(
+            number_product=len(products),
+            size=api.get_products_size(products)
+            )
     )
 
-    L2_files_urls = get_filenames_request(products, DOWNLOAD_DIR / product)
+    # list of uuids for each product in the query
+    ids_request = list(products.keys())
 
-    if len(L2_files_urls) == 0:
-        tqdm.write("Done\n")
+    if len(ids_request) == 0:
+        tqdm.write("Done!")
         sys.exit(0)
 
-    # PREPROCESS DATA
-
-    tqdm.write("Converting into L3 products\n")
-
-    # harpconvert commands :
-    # the source data is filtered + binning data by latitude/longitude
-
-    keep_general = [
-        "latitude",
-        "longitude",
-        "sensor_altitude",
-        "sensor_azimuth_angle",
-        "sensor_zenith_angle",
-        "solar_azimuth_angle",
-        "solar_zenith_angle",
+    # list of downloaded filenames urls
+    filenames = [
+        DOWNLOAD_DIR / f"{products[file_id]['title']}.nc"
+        for file_id in ids_request
     ]
 
-    harp_dict = {
-        "L2__O3____": {
-            "keep": [
-                "O3_column_number_density",
-                "O3_effective_temperature",
-                "cloud_fraction",
-            ],
-            "filter": [f"O3_column_number_density_validity>={qa}"],
-            "convert": [f"derive(O3_column_number_density [{unit}])"],
-        },
-        "L2__NO2___": {
-            "keep": [
-                "tropospheric_NO2_column_number_density",
-                "NO2_column_number_density",
-                "stratospheric_NO2_column_number_density",
-                "NO2_slant_column_number_density",
-                "tropopause_pressure",
-                "absorbing_aerosol_index",
-                "cloud_fraction",
-            ],
-            "filter": [
-                f"tropospheric_NO2_column_number_density_validity>={qa}",
-                "tropospheric_NO2_column_number_density>=0",
-            ],
-            "convert": [
-                f"derive(tropospheric_NO2_column_number_density [{unit}])",
-                f"derive(stratospheric_NO2_column_number_density [{unit}])",
-                f"derive(NO2_column_number_density [{unit}])",
-                f"derive(NO2_slant_column_number_density [{unit}])",
-            ],
-        },
-        "L2__SO2___": {
-            "keep": [
-                "SO2_column_number_density",
-                "SO2_column_number_density_amf",
-                "SO2_slant_column_number_density",
-                "cloud_fraction",
-            ],
-            "filter": [f"SO2_column_number_density_validity>={qa}"],
-            "convert": [
-                f"derive(SO2_column_number_density [{unit}])",
-                f"derive(SO2_slant_column_number_density [{unit}])",
-            ],
-        },
-        "L2__CO____": {
-            "keep": ["CO_column_number_density", "H2O_column_number_density"],
-            "filter": [f"CO_column_number_density_validity>={qa}"],
-            "convert": [
-                f"derive(CO_column_number_density [{unit}])",
-                f"derive(H2O_column_number_density [{unit}])",
-            ],
-        },
-        "L2__CH4___": {
-            "keep": [
-                "CH4_column_volume_mixing_ratio_dry_air",
-                "aerosol_height",
-                "aerosol_optical_depth",
-                "cloud_fraction",
-            ],
-            "filter": [f"CH4_column_volume_mixing_ratio_dry_air_validity>={qa}"],
-            "convert": [],
-        },
-        "L2__HCHO__": {
-            "keep": [
-                "tropospheric_HCHO_column_number_density",
-                "tropospheric_HCHO_column_number_density_amf",
-                "HCHO_slant_column_number_density",
-                "cloud_fraction",
-            ],
-            "filter": [f"tropospheric_HCHO_column_number_density_validity>={qa}"],
-            "convert": [
-                f"derive(tropospheric_HCHO_column_number_density [{unit}])",
-                f"derive(HCHO_slant_column_number_density [{unit}])",
-            ],
-        },
-        "L2__CLOUD_": {
-            "keep": [
-                "cloud_fraction",
-                "cloud_top_pressure",
-                "cloud_top_height",
-                "cloud_base_pressure",
-                "cloud_base_height",
-                "cloud_optical_depth",
-                "surface_albedo",
-            ],
-            "filter": [f"cloud_fraction_validity>={qa}"],
-            "convert": [],
-        },
-        "L2__AER_AI": {
-            "keep": [
-                "absorbing_aerosol_index",
-            ],
-            "filter": [f"absorbing_aerosol_index_validity>={qa}"],
-            "convert": [],
-        },
-        "L2__AER_LH": {
-            "keep": [
-                "aerosol_height",
-                "aerosol_pressure",
-                "aerosol_optical_depth",
-                "cloud_fraction",
-            ],
-            "filter": [f"aerosol_height_validity>={qa}"],
-            "convert": [],
-        },
-    }
+    makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+    with ThreadPool(num_threads) as pool:
+        pool.map(
+            partial(
+                fetch_product,
+                api=api,
+                products=products,
+                download_dir=DOWNLOAD_DIR
+            ),
+            ids_request)
+
+        pool.close()
+        pool.join()
+
+    tqdm.write("Converting into L3 products\n")
 
     # Step size for spatial re-gridding (in degrees)
     lon_step, lat_step = resolution
@@ -184,110 +106,96 @@ def main(
     if aoi is None:
         extent = [-180, 180, -90, 90]
     else:
-        extent = bounding_box(Path(aoi))
+        extent = geopandas.read_file(Path(aoi)).bounds.values.squeeze()
 
     # computes offsets and number of samples
-    lat_edge_length = int(abs(extent[3] - extent[2]) / lat_step + 1)
-    lat_edge_offset = extent[2]
-    lon_edge_length = int(abs(extent[1] - extent[0]) / lon_step + 1)
-    lon_edge_offset = extent[0]
+    lat_length, lat_offset, lon_length, lon_offset = compute_lengths_and_offsets(extent, lat_step, lon_step)
 
-    # create HARP commands
-    if command is None:
-        harp_commands = (
-            ";".join(harp_dict[product]["filter"])
-            + (";" if len(harp_dict[product]["filter"]) != 0 else "")
-            + ";".join(harp_dict[product]["convert"])
-            + (";" if len(harp_dict[product]["convert"]) != 0 else "")
-            + "derive(datetime_stop {time});"
-            + f"bin_spatial({lat_edge_length},{lat_edge_offset},{lat_step},{lon_edge_length},{lon_edge_offset},{lon_step});"
-            + "derive(latitude {latitude});derive(longitude {longitude});"
-            + f"keep({','.join(harp_dict[product]['keep'] + keep_general)})"
-        )
-
-    else:
-        harp_commands = command
-
-    # perform conversion
-    convert_to_l3_products(
-        L2_files_urls,
-        pre_commands=harp_commands,
-        post_commands="",
-        export_path=EXPORT_DIR / product.replace("L2", "L3"),
-        num_workers=num_workers,
+    harp_commands = generate_harp_commands(
+        producttype,
+        qa,
+        unit,
+        lon_step,
+        lat_step,
+        lat_length,
+        lat_offset,
+        lon_length,
+        lon_offset
     )
+
+    makedirs(EXPORT_DIR, exist_ok=True)
+    tqdm.write(f"Launched {num_workers} processes")
+
+    with Pool(processes=num_workers) as pool:
+        list(
+            tqdm(
+                pool.imap_unordered(
+                    partial(
+                        process_file,
+                        harp_commands=harp_commands,
+                        export_dir=EXPORT_DIR
+                    ),
+                    filenames,
+                ),
+                desc="Converting",
+                leave=False,
+                total=len(filenames),
+            )
+        )
+        pool.close()
+        pool.join()
 
     # Recover attributes
     attributes = {
         filename.name: {
-            "time_coverage_start": xr.open_dataset(filename).attrs[
-                "time_coverage_start"
-            ],
+            "time_coverage_start": xr.open_dataset(filename).attrs["time_coverage_start"],
             "time_coverage_end": xr.open_dataset(filename).attrs["time_coverage_end"],
         }
-        for filename in L2_files_urls
+        for filename in filenames
     }
 
-    # AGGREGATE DATASET
-
     tqdm.write("Processing data\n")
-
-    # Avoid lost attributes during conversion
     xr.set_options(keep_attrs=True)
-
-    def preprocess(ds):
-        ds["time"] = pd.to_datetime(
-            np.array([attributes[ds.attrs["source_product"]]["time_coverage_start"]])
-        ).values
-        return ds
 
     DS = xr.open_mfdataset(
         [
             str(filename.relative_to(".")).replace("L2", "L3")
-            for filename in L2_files_urls
+            for filename in filenames
             if exists(str(filename.relative_to(".")).replace("L2", "L3"))
         ],
         combine="nested",
         concat_dim="time",
         parallel=True,
-        preprocess=preprocess,
+        preprocess=partial(
+            preprocess_time,
+            attributes=attributes
+            ),
         decode_times=False,
         chunks={"time": chunk_size},
     )
+
     DS = DS.sortby("time")
     DS.rio.write_crs("epsg:4326", inplace=True)
     DS.rio.set_spatial_dims(x_dim="longitude", y_dim="latitude", inplace=True)
-
-    # EXPORT DATASET
 
     tqdm.write("Exporting netCDF file\n")
 
     start = min(products[uuid]["beginposition"] for uuid in products.keys())
     end = max(products[uuid]["endposition"] for uuid in products.keys())
-    export_dir = PROCESSED_DIR / f"processed{product[2:]}"
+
+    export_dir = PROCESSED_DIR / f"processed{producttype[2:]}"
     makedirs(export_dir, exist_ok=True)
     file_export_name = export_dir / (
-        f"{product[4:]}{start.day}-{start.month}-{start.year}__"
+        f"{producttype[4:]}{start.day}-{start.month}-{start.year}__"
         f"{end.day}-{end.month}-{end.year}.nc"
     )
 
     DS.to_netcdf(file_export_name)
 
-    tqdm.write("Done\n")
+    tqdm.write("Done!")
 
 
-if __name__ == "__main__":
-
-    # Ignore warnings
-    warnings.filterwarnings("ignore", category=RuntimeWarning)
-    warnings.filterwarnings("ignore", category=FutureWarning)
-
-    # PARAMS
-
-    # Perform checksum verification after each download
-    CHECKSUM = True
-
-    # CLI ARGUMENTS
+if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(
         description=(
@@ -333,13 +241,6 @@ if __name__ == "__main__":
         "--aoi", help="path to the area of interest (.geojson)", type=str
     )
 
-    # Harp command: Harp convert command used during import of products
-    parser.add_argument(
-        "--command",
-        help="harp convert command used during import of products",
-        type=str,
-    )
-
     # Unit: Unit conversion
     parser.add_argument("--unit", help="unit conversion", type=str, default="mol/m2")
 
@@ -381,31 +282,13 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # PATHS
-
-    # download_directory: directory for L2 products
-    DOWNLOAD_DIR = Path("L2_data")
-
-    # export_directory: directory for L3 products
-    EXPORT_DIR = Path("L3_data")
-
-    # processed_directory: directory for processed products (aggregated+masked)
-    PROCESSED_DIR = Path("processed")
-
-    # CREDENTIALS
-
-    DHUS_USER = "s5pguest"
-    DHUS_PASSWORD = "s5pguest"
-    DHUS_URL = "https://s5phub.copernicus.eu/dhus"
-
     main(
-        product=args.product,
+        producttype=args.product,
         aoi=args.aoi,
         date=args.date,
         qa=args.qa,
         unit=args.unit,
         resolution=args.resolution,
-        command=args.command,
         chunk_size=args.chunk_size,
         num_threads=args.num_threads,
         num_workers=args.num_workers,
